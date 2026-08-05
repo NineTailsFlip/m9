@@ -61,6 +61,7 @@ private val m9App = NineApp(
                 KeyHelp("OK", "Open the selected message's details; in the reply row, send."),
                 KeyHelp("Call key", "Call this thread's number, or send from the reply row."),
                 KeyHelp("Back", "Leave the reply row if inside it, else close the conversation."),
+                KeyHelp("#", "Copy the selected message's one-time code, when it has one."),
                 KeyHelp("*", "Open the menu: forward, copy, delete message, resend, call, contact, settings."),
                 KeyHelp("— Compose —", ""),
                 KeyHelp("OK, on \"To\"", "Pick a recipient by name or typed number."),

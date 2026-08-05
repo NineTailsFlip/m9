@@ -219,7 +219,12 @@ class ConversationActivity : Activity() {
             hintBar.setText(if (segments.isEmpty()) "ok send · ‹ back to messages" else "$segments · ok send")
             return
         }
-        hintBar.setText(if (canCall()) "* menu · ↓ reply · ← → day" else "* menu · ↓ reply · ← → day")
+        // "# copy code" only appears when the selected message actually has one — a hint
+        // advertising a key that does nothing is worse than no hint, and on this screen the
+        // answer changes with every move of the selection (hence updateHint() on each).
+        hintBar.setText(
+            if (selectedCode() != null) "# copy code · * menu · ↓ reply" else "* menu · ↓ reply · ← → day",
+        )
     }
 
     /** Down past the last message enters the compose field; Back leaves it. Focus is granted only
@@ -270,12 +275,14 @@ class ConversationActivity : Activity() {
         when (keyCode) {
             KeyEvent.KEYCODE_DPAD_UP -> {
                 rowListView.moveSelection(-1)
+                updateHint()
                 return true
             }
             KeyEvent.KEYCODE_DPAD_DOWN -> {
                 // Down past the last message is what opens the reply field — the plan's inline
                 // compose row, reached without a key of its own.
                 if (!rowListView.canMoveSelection(1)) startComposing() else rowListView.moveSelection(1)
+                updateHint()
                 return true
             }
             KeyEvent.KEYCODE_DPAD_LEFT -> {
@@ -288,6 +295,10 @@ class ConversationActivity : Activity() {
             }
             KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
                 openSelectedMessage()
+                return true
+            }
+            KeyEvent.KEYCODE_POUND -> {
+                copySelectedCode()
                 return true
             }
             KeyEvent.KEYCODE_CALL -> {
@@ -362,6 +373,19 @@ class ConversationActivity : Activity() {
     private fun jumpDay(direction: Int) {
         val next = dayJumpIndex(rows, rowListView.selectedIndex, direction) ?: return
         rowListView.setSelectedIndex(next)
+        updateHint()
+    }
+
+    /** The one-time code in the selected message, if it has one. */
+    private fun selectedCode(): String? = selectedMessage()?.body?.let { OtpCodes.find(it) }
+
+    /** `#` on a message: the fastest possible path from "a code arrived" to "the code is on the
+     *  clipboard" — no menu, no selection of text, one key. Silent when the selected message has
+     *  no code, rather than copying something arbitrary. */
+    private fun copySelectedCode() {
+        val code = selectedCode() ?: return
+        copyToClipboard(code)
+        hintBar.setText("copied $code")
     }
 
     private fun selectedMessage(): MessageRow.Entry? = rows.getOrNull(rowListView.selectedIndex) as? MessageRow.Entry
@@ -418,9 +442,18 @@ class ConversationActivity : Activity() {
         )
     }
 
+    /** Flagged sensitive for the same reason [life.furrer.m9.sms.CopyCodeReceiver] does it:
+     *  Android 13+ previews what was copied in its confirmation, and a one-time code is exactly
+     *  what shouldn't be rendered over a lock screen. */
     private fun copyToClipboard(text: String) {
         val clipboard = getSystemService(android.content.ClipboardManager::class.java) ?: return
-        clipboard.setPrimaryClip(android.content.ClipData.newPlainText("Message", text))
+        clipboard.setPrimaryClip(
+            android.content.ClipData.newPlainText("Message", text).apply {
+                description.extras = android.os.PersistableBundle().apply {
+                    putBoolean(android.content.ClipDescription.EXTRA_IS_SENSITIVE, true)
+                }
+            },
+        )
     }
 
     private fun confirmDeleteMessage(message: MessageRow.Entry) {
