@@ -7,6 +7,7 @@ import android.graphics.Paint
 import android.os.Bundle
 import android.provider.Telephony
 import android.text.InputType
+import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
@@ -34,96 +35,103 @@ import life.furrer.nine.core.util.Async
 private const val SIDE_PADDING_DP = 16
 private const val REQUEST_PICK_NUMBER = 200
 
-/** A new message: who to, what to say, send.
+/** A new message — deliberately the same screen as a conversation, with the messages missing.
  *
- *  **This screen has no contact-matching code of its own, on purpose.** Picking a recipient is
- *  `:contacts`' [ContactValuePickerActivity] with `EXTRA_KIND = PHONE` — the identical screen,
- *  identical keys and identical behaviour as C9's "Add attendee", which picks an email with the
- *  same code. Choosing a number and choosing an address are one interaction users learn once.
+ *  The recipient sits in the header where a thread puts the person you're talking to, the message
+ *  is written in the row at the bottom where a thread puts the reply, and the empty space between
+ *  them is exactly the space a conversation's history would occupy. Sending lands you in the real
+ *  thread, which by then looks identical except that it has the message in it.
  *
- *  It also means the multi-value chooser lands *here* rather than in the picker, which is
- *  load-bearing rather than tidy: the picker owns a live [life.furrer.nine.core.ui.SearchField],
- *  and this hardware's T9 IME keeps composing into a focused field behind an open menu (see that
- *  class's own doc comment for the on-device finding). This screen has no search field, so a
- *  [MenuSheet] over it is safe — exactly the position `EventEditActivity` is in when it asks
- *  which of several emails to invite.
+ *  Its first version was a form — a "To" field above a "Text" field, each opened for editing — and
+ *  that was the wrong shape: it made composing a different activity from replying, when they're
+ *  the same act with one extra question. The keys follow the conversation screen's too: Up/Down
+ *  move between the two things on screen, OK acts on the selected one, and OK in the message row
+ *  sends.
  *
- *  Fields are edited inline in `TaskEditActivity`/`EventEditActivity`'s style, including their
- *  Autofill workaround: [commitInlineEdit] unconditionally `recreate()`s and [RetainedState]
- *  carries the unsaved draft across it. */
+ *  There is no inline-edit-then-`recreate()` dance here (unlike `TaskEditActivity`, and unlike
+ *  this screen's own first version): the message field is a permanent part of the layout rather
+ *  than a row swapped for an `EditText`, so the Autofill quirk that workaround exists for never
+ *  arises. `ConversationActivity`'s reply row is built the same way for the same reason. */
 class ComposeActivity : Activity() {
 
     private var recipient: String = ""
     private var recipientName: String? = null
-    private var body: String = ""
-    private var selectedField = Field.RECIPIENT
 
-    private var inlineEdit: EditText? = null
+    /** Which of the screen's two parts the keys act on. Mirrors the conversation screen, where
+     *  the same Down that walks off the last message lands in the reply row. */
+    private enum class Focus { RECIPIENT, MESSAGE }
+
+    private var focus = Focus.RECIPIENT
+    private var composing = false
+
     private var pendingStarKeyCode: Int? = null
     private var starLongPressHandled = false
 
-    private lateinit var recipientRow: TextView
-    private lateinit var bodyRow: TextView
-    private lateinit var fieldColumn: LinearLayout
+    private lateinit var titleView: TextView
+    private lateinit var subtitleView: TextView
+    private lateinit var messageField: EditText
     private lateinit var hintBar: HintBar
     private lateinit var menuSheet: MenuSheet
-    private lateinit var keyFocusAnchor: View
-
-    private enum class Field { RECIPIENT, BODY }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         applyConfiguredTheme()
 
-        // A draft carried across the Autofill-driven recreate() below, or a fresh screen.
-        val retained = lastNonConfigurationInstance as? RetainedState
-        if (retained != null) {
-            recipient = retained.recipient
-            recipientName = retained.recipientName
-            body = retained.body
-            selectedField = retained.selectedField
-        } else {
-            val (draftTo, draftBody) = Prefs.composeDraft(this)
-            recipient = draftTo
-            body = draftBody
-            recipientName = draftTo.takeIf { it.isNotBlank() }?.let { SmsStore.lookupContactName(this, it) }
-            selectedField = if (recipient.isBlank()) Field.RECIPIENT else Field.BODY
-            // An explicit intent always wins over a leftover draft — being handed a recipient is
-            // a clearer statement of intent than something abandoned earlier.
-            if (intent.data != null || intent.hasExtra(Intent.EXTRA_TEXT)) prefillFromIntent()
+        val (draftTo, draftBody) = Prefs.composeDraft(this)
+        recipient = draftTo
+        recipientName = draftTo.takeIf { it.isNotBlank() }?.let { SmsStore.lookupContactName(this, it) }
+        var initialBody = draftBody
+        // An explicit intent always wins over a leftover draft — being handed a recipient is a
+        // clearer statement of intent than something abandoned earlier.
+        if (intent.data != null || intent.hasExtra(Intent.EXTRA_TEXT)) {
+            intent.data?.schemeSpecificPart?.takeIf { it.isNotBlank() }?.let { address ->
+                recipient = address
+                recipientName = SmsStore.lookupContactName(this, address)
+            }
+            intent.getStringExtra(Intent.EXTRA_TEXT)?.let { initialBody = it }
         }
 
-        recipientRow = fieldRow()
-        bodyRow = fieldRow()
-        // Something focusable that isn't an EditText, so removing an inline editor from the
-        // hierarchy has somewhere to hand focus — the same anchor TaskEditActivity keeps.
-        keyFocusAnchor = View(this).apply {
-            isFocusable = true
-            isFocusableInTouchMode = true
+        titleView = TextView(this).apply {
+            textSize = 18f
+            setPadding(dp(SIDE_PADDING_DP), dp(10), dp(SIDE_PADDING_DP), 0)
         }
-        fieldColumn = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            addView(keyFocusAnchor, LinearLayout.LayoutParams(0, 0))
-            // WRAP_CONTENT, not a fixed height: a resolved recipient renders as two lines (name
-            // then number), and confirmed on-device that a fixed row clips the number away —
-            // leaving the screen claiming to be addressed to a name with no visible number.
-            addView(recipientRow, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
-            addView(bodyRow, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+        subtitleView = TextView(this).apply {
+            textSize = 12f
+            setTextColor(Palette.GRAY_MUTED)
+            setPadding(dp(SIDE_PADDING_DP), 0, dp(SIDE_PADDING_DP), dp(6))
+        }
+        // The gap where a conversation's messages would be. Left empty rather than filled with an
+        // explanation: the header already says "New message", and a screen this small is not
+        // worth spending on telling someone what they just chose to do.
+        val emptySpace = View(this)
+
+        messageField = EditText(this).apply {
+            hint = "Message…"
+            textSize = Prefs.fontSize(this@ComposeActivity).toFloat()
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE
+            setText(initialBody)
+            setTextColor(Palette.WHITE)
+            setHintTextColor(Palette.GRAY_FAINT)
+            setBackgroundColor(Palette.BLACK)
+            gravity = Gravity.START
+            setPadding(dp(SIDE_PADDING_DP), dp(6), dp(SIDE_PADDING_DP), dp(6))
+            isFocusable = false
+            isFocusableInTouchMode = false
+            addTextChangedListener(object : android.text.TextWatcher {
+                override fun afterTextChanged(s: android.text.Editable?) = updateHint()
+                override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+                override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            })
         }
         hintBar = HintBar(this)
         menuSheet = MenuSheet(this)
 
         val mainColumn = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            addView(
-                TextView(this@ComposeActivity).apply {
-                    text = "New message"
-                    textSize = 18f
-                    setTextColor(Palette.WHITE)
-                    setPadding(dp(SIDE_PADDING_DP), dp(10), dp(SIDE_PADDING_DP), dp(8))
-                },
-            )
-            addView(fieldColumn, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
+            addView(titleView)
+            addView(subtitleView)
+            addView(emptySpace, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
+            addView(messageField)
             addView(hintBar)
         }
         val root = FrameLayout(this).apply {
@@ -133,38 +141,20 @@ class ComposeActivity : Activity() {
         }
         setContentView(root)
         hideStatusBar()
+
+        // With a recipient already known there is nothing left to choose, so start where the
+        // writing happens — the same landing spot an addressed smsto: intent deserves.
+        focus = if (recipient.isBlank()) Focus.RECIPIENT else Focus.MESSAGE
         render()
     }
 
-    /** An `smsto:` intent from another app (or from P9's contact detail screen), which arrives
-     *  already addressed — so the useful landing spot is the body, not the recipient. */
-    private fun prefillFromIntent() {
-        body = intent.getStringExtra(Intent.EXTRA_TEXT).orEmpty()
-
-        val address = intent.data?.schemeSpecificPart?.takeIf { it.isNotBlank() }
-        if (address != null) {
-            recipient = address
-            recipientName = SmsStore.lookupContactName(this, address)
-        }
-        // An addressed intent lands on the body (there's nothing left to choose); a forward,
-        // which arrives with text but nobody to send it to, lands on the recipient.
-        selectedField = if (address != null) Field.BODY else Field.RECIPIENT
-    }
-
-    override fun onRetainNonConfigurationInstance(): Any =
-        RetainedState(recipient, recipientName, body, selectedField)
-
     override fun onPause() {
         super.onPause()
-        // Not while an inline editor is mid-recreate: onPause fires during the Autofill-driven
-        // recreate() too, and RetainedState is already carrying the text across that. Writing
-        // here as well would be harmless but would also persist a draft the user is still typing.
-        if (!isChangingConfigurations) Prefs.setComposeDraft(this, recipient, body)
+        Prefs.setComposeDraft(this, recipient, messageField.text.toString())
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        // Same defensive cancel EventEditActivity/TaskEditActivity make — see KNOWN_ISSUE_T9_IME.md.
         getSystemService(android.view.autofill.AutofillManager::class.java)?.cancel()
     }
 
@@ -173,68 +163,93 @@ class ComposeActivity : Activity() {
         if (hasFocus) hideStatusBar()
     }
 
-    private fun fieldRow(): TextView = TextView(this).apply {
-        textSize = 16f
-        setPadding(dp(SIDE_PADDING_DP), dp(8), dp(SIDE_PADDING_DP), dp(8))
-    }
-
     private fun render() {
-        renderRow(recipientRow, "To", recipientLabel(), selectedField == Field.RECIPIENT)
-        renderRow(bodyRow, "Text", body.ifEmpty { "(empty)" }, selectedField == Field.BODY)
+        val selected = focus == Focus.RECIPIENT && !composing
+        titleView.text = when {
+            recipientName != null -> recipientName
+            recipient.isNotBlank() -> recipient
+            else -> "New message"
+        }
+        titleView.setTextColor(if (selected) Palette.WHITE else Palette.GRAY_DIM)
+        titleView.paintFlags = if (selected) {
+            titleView.paintFlags or Paint.UNDERLINE_TEXT_FLAG
+        } else {
+            titleView.paintFlags and Paint.UNDERLINE_TEXT_FLAG.inv()
+        }
+
+        // The number only earns its own line when it isn't already the title.
+        subtitleView.text = when {
+            recipient.isBlank() -> "No recipient yet"
+            recipientName != null -> recipient
+            else -> ""
+        }
+        subtitleView.visibility = if (subtitleView.text.isNullOrEmpty()) View.GONE else View.VISIBLE
+
         updateHint()
     }
 
-    private fun recipientLabel(): String = when {
-        recipient.isEmpty() -> "(nobody yet)"
-        recipientName != null -> "$recipientName\n$recipient"
-        else -> recipient
-    }
-
-    private fun renderRow(row: TextView, label: String, value: String, selected: Boolean) {
-        row.text = "$label   $value"
-        row.setTextColor(if (selected) Palette.WHITE else Palette.GRAY_DIM)
-        row.paintFlags = if (selected) {
-            row.paintFlags or Paint.UNDERLINE_TEXT_FLAG
-        } else {
-            row.paintFlags and Paint.UNDERLINE_TEXT_FLAG.inv()
-        }
-    }
-
     private fun updateHint() {
-        if (inlineEdit != null) {
-            val segments = segmentLabel(inlineEdit?.text?.toString().orEmpty())
-            hintBar.setText(if (segments.isEmpty()) "ok done" else "$segments · ok done")
+        if (composing) {
+            val segments = segmentLabel(messageField.text.toString())
+            hintBar.setText(if (segments.isEmpty()) "ok send · ↑ recipient" else "$segments · ok send")
             return
         }
         hintBar.setText(
-            when (selectedField) {
-                Field.RECIPIENT -> "ok pick · * menu · call send"
-                Field.BODY -> "ok edit · * menu · call send"
+            when (focus) {
+                Focus.RECIPIENT -> "ok pick recipient · ↓ message · * menu"
+                Focus.MESSAGE -> "ok write · ↑ recipient · * menu"
             },
         )
     }
 
-    /** Inline-edit keys are intercepted here rather than in [onKeyDown], for the reason
-     *  `TaskEditActivity`/`EventEditActivity` document on their own equivalents: a focused
-     *  EditText consumes OK/ENTER (a multi-line field turns them into a newline) and Back, so
-     *  onKeyDown — which only runs for keys no view took — never sees them. Confirmed on-device
-     *  as a real dead end: pressing OK to finish a message inserted a line break, the field
-     *  stayed open, and the send key then fell through to the system, which opened P9's dialer. */
+    private fun startComposing() {
+        focus = Focus.MESSAGE
+        if (composing) {
+            render()
+            return
+        }
+        composing = true
+        messageField.isFocusable = true
+        messageField.isFocusableInTouchMode = true
+        messageField.requestFocus()
+        render()
+    }
+
+    private fun stopComposing() {
+        if (!composing) return
+        composing = false
+        messageField.clearFocus()
+        messageField.isFocusable = false
+        messageField.isFocusableInTouchMode = false
+    }
+
+    /** The message field's keys are intercepted ahead of normal dispatch, for the reason
+     *  `ConversationActivity`'s reply row documents: a focused EditText consumes OK/ENTER as a
+     *  newline and every character key, so [onKeyDown] — which only runs for keys no view took —
+     *  would never see them. */
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        val editing = inlineEdit
-        if (editing != null && event.action == KeyEvent.ACTION_DOWN) {
+        if (composing && event.action == KeyEvent.ACTION_DOWN) {
             when (event.keyCode) {
-                KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_BACK -> {
-                    commitInlineEdit()
+                KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_CALL -> {
+                    send()
                     return true
                 }
-                KeyEvent.KEYCODE_CALL -> {
-                    // Send straight from the open field — no commit-then-recreate first, since
-                    // send() leaves this screen anyway and a recreate mid-send would act on a
-                    // dying instance.
-                    body = editing.text.toString()
-                    inlineEdit = null
-                    send()
+                KeyEvent.KEYCODE_DPAD_UP -> {
+                    // Back up to the recipient only from an empty message; mid-sentence, Up
+                    // belongs to the text cursor.
+                    if (messageField.text.isEmpty()) {
+                        stopComposing()
+                        focus = Focus.RECIPIENT
+                        render()
+                        return true
+                    }
+                }
+                KeyEvent.KEYCODE_BACK -> {
+                    // Reached only once the field is empty — this hardware's IME consumes Back as
+                    // a backspace while there's text (see ConversationActivity's own note).
+                    stopComposing()
+                    focus = Focus.RECIPIENT
+                    render()
                     return true
                 }
             }
@@ -244,27 +259,26 @@ class ComposeActivity : Activity() {
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
         if (menuSheet.handleKeyDown(keyCode, event)) return true
-        if (inlineEdit != null) return super.onKeyDown(keyCode, event)
+        if (composing) return super.onKeyDown(keyCode, event)
 
         when (keyCode) {
-            KeyEvent.KEYCODE_DPAD_UP -> {
-                selectedField = Field.RECIPIENT
-                render()
+            KeyEvent.KEYCODE_DPAD_DOWN -> {
+                startComposing()
                 return true
             }
-            KeyEvent.KEYCODE_DPAD_DOWN -> {
-                selectedField = Field.BODY
+            KeyEvent.KEYCODE_DPAD_UP -> {
+                focus = Focus.RECIPIENT
                 render()
                 return true
             }
             KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
-                when (selectedField) {
-                    Field.RECIPIENT -> openNumberPicker()
-                    Field.BODY -> editBody()
+                when (focus) {
+                    Focus.RECIPIENT -> openNumberPicker()
+                    Focus.MESSAGE -> startComposing()
                 }
                 return true
             }
-            KeyEvent.KEYCODE_CALL, KeyEvent.KEYCODE_POUND -> {
+            KeyEvent.KEYCODE_CALL -> {
                 send()
                 return true
             }
@@ -301,7 +315,8 @@ class ComposeActivity : Activity() {
     }
 
     /** The whole recipient interaction: search by name, browse letter-grouped, or type the number
-     *  itself and take the `Add "…"` row the picker puts at the top. */
+     *  itself and take the `Add "…"` row the picker puts at the top. Identical to the screen C9
+     *  picks an attendee's email with. */
     private fun openNumberPicker() {
         startActivityForResult(
             Intent(this, ContactValuePickerActivity::class.java)
@@ -320,9 +335,8 @@ class ComposeActivity : Activity() {
             applyRecipient(single, name)
             return
         }
-        // More than one number on the picked contact — asked here rather than in the picker, for
-        // the reason this class's doc comment gives (and that EventEditActivity's own comment
-        // gives for emails): no search field on this screen for the IME to keep composing into.
+        // Several numbers on the picked contact — asked here rather than in the picker, because
+        // this screen has no search field for the IME to keep composing into behind the menu.
         val values = data.getStringArrayExtra(ContactValuePickerActivity.EXTRA_VALUES) ?: return
         val labels = data.getStringArrayExtra(ContactValuePickerActivity.EXTRA_LABELS).orEmpty()
         menuSheet.show(
@@ -336,53 +350,17 @@ class ComposeActivity : Activity() {
     private fun applyRecipient(number: String, name: String?) {
         recipient = number
         recipientName = name
-        // Straight on to what you actually came to write.
-        selectedField = Field.BODY
-        render()
-    }
-
-    private fun editBody() {
-        val editText = EditText(this).apply {
-            setText(body)
-            setSelection(body.length)
-            textSize = 16f
-            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE
-            setTextColor(Palette.WHITE)
-            setBackgroundColor(Palette.BLACK)
-            setPadding(dp(SIDE_PADDING_DP), dp(8), dp(SIDE_PADDING_DP), dp(8))
-            addTextChangedListener(object : android.text.TextWatcher {
-                override fun afterTextChanged(s: android.text.Editable?) = updateHint()
-                override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-                override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
-            })
-        }
-        val index = fieldColumn.indexOfChild(bodyRow)
-        fieldColumn.removeView(bodyRow)
-        fieldColumn.addView(editText, index, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
-        editText.requestFocus()
-        inlineEdit = editText
-        updateHint()
-    }
-
-    /** Unconditionally `recreate()`s, exactly as `TaskEditActivity.commitInlineEdit` does and for
-     *  the same confirmed-on-device reason: focusing an EditText on this hardware can pop an
-     *  Autofill suggestion that corrupts the window's key dispatch, and a fresh window is the only
-     *  reliable recovery. [RetainedState] is what makes that safe to do with an unsaved draft. */
-    private fun commitInlineEdit() {
-        val editText = inlineEdit ?: return
-        body = editText.text.toString()
-        keyFocusAnchor.requestFocus()
-        inlineEdit = null
-        recreate()
+        // Straight on to what you actually came here to write.
+        startComposing()
     }
 
     private fun openMenu() {
         val items = mutableListOf<MenuItem>()
-        items += MenuItem("Pick recipient") { openNumberPicker() }
-        if (recipient.isNotEmpty() && body.isNotBlank()) items += MenuItem("Send") { send() }
+        items += MenuItem(if (recipient.isBlank()) "Pick recipient" else "Change recipient") { openNumberPicker() }
+        if (recipient.isNotBlank() && messageField.text.isNotBlank()) items += MenuItem("Send") { send() }
         items += MenuItem("Discard") {
             recipient = ""
-            body = ""
+            messageField.setText("")
             Prefs.setComposeDraft(this, "", "")
             finish()
         }
@@ -390,19 +368,19 @@ class ComposeActivity : Activity() {
         menuSheet.show(items)
     }
 
-    /** Never a silent no-op: an empty recipient or body says so in the hint bar, because on a
-     *  screen with no send button the alternative is a keypress that appears to do nothing. */
+    /** Never a silent no-op: on a screen with no send button, a keypress that appears to do
+     *  nothing is indistinguishable from a broken key. */
     private fun send() {
-        if (recipient.isEmpty()) {
-            hintBar.setText("no recipient yet — ok to pick one")
+        val text = messageField.text.toString().trim()
+        if (recipient.isBlank()) {
+            hintBar.setText("no recipient yet — ↑ then ok to pick one")
             return
         }
-        if (body.isBlank()) {
+        if (text.isBlank()) {
             hintBar.setText("nothing to send — write something first")
             return
         }
         val address = recipient
-        val text = body.trim()
         Async.run(
             background = {
                 val threadId = Telephony.Threads.getOrCreateThreadId(this, address)
@@ -411,9 +389,9 @@ class ComposeActivity : Activity() {
             },
             onResult = { threadId ->
                 Prefs.setComposeDraft(this, "", "")
-                // Straight into the conversation, which is where the message now lives and where
-                // its delivery state will appear — a compose screen that just closed would leave
-                // the user wondering whether anything happened.
+                // Into the conversation, which is where the message now lives and where its
+                // delivery state will appear — and which is what this screen was already shaped
+                // like.
                 startActivity(ConversationActivity.intentFor(this, threadId, address, recipientName))
                 finish()
             },
@@ -423,13 +401,6 @@ class ComposeActivity : Activity() {
     private fun dp(value: Int): Int = android.util.TypedValue.applyDimension(
         android.util.TypedValue.COMPLEX_UNIT_DIP, value.toFloat(), resources.displayMetrics
     ).toInt()
-
-    private data class RetainedState(
-        val recipient: String,
-        val recipientName: String?,
-        val body: String,
-        val selectedField: Field,
-    )
 
     companion object {
         fun intentFor(context: Context): Intent = Intent(context, ComposeActivity::class.java)
