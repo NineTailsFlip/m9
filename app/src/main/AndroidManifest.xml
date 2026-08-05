@@ -47,12 +47,16 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+        </activity>
 
-            <!-- One of the four components ROLE_SMS requires: something that answers ACTION_SENDTO
-                 for the sms:/smsto:/mms:/mmsto: schemes. It belongs on the compose screen, which
-                 doesn't exist until M5 — until then it lands here, which at least opens M9 rather
-                 than failing to resolve. Move it to ComposeActivity when that arrives; leaving it
-                 in both places would make "message this number" ambiguous. -->
+        <!-- The ROLE_SMS component that answers "message this number": an addressed smsto:
+             intent from any app lands straight on the compose screen with the recipient filled
+             in. Exported because that's the entire point — other apps hand off to it. -->
+        <activity
+            android:name=".compose.ComposeActivity"
+            android:exported="true"
+            android:windowSoftInputMode="stateAlwaysHidden"
+            android:theme="@style/Theme.Nine">
             <intent-filter>
                 <action android:name="android.intent.action.SENDTO" />
                 <category android:name="android.intent.category.DEFAULT" />

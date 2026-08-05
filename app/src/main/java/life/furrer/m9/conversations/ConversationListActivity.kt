@@ -16,6 +16,7 @@ import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
+import life.furrer.m9.compose.ComposeActivity
 import life.furrer.m9.core.Prefs
 import life.furrer.m9.sms.SmsMessage
 import life.furrer.m9.sms.SmsRole
@@ -370,8 +371,10 @@ class ConversationListActivity : Activity() {
     private fun openMenu() {
         val row = selectedRow()
         val items = mutableListOf<MenuItem>()
+        items += MenuItem("New message") { startActivity(ComposeActivity.intentFor(this)) }
         if (row != null) {
             items += MenuItem("Mark read") { markRead(row) }
+            items += MenuItem("Mark unread") { markUnread(row) }
             items += MenuItem("Delete conversation") { confirmDeleteThread(row) }
             if (row.canCall) items += MenuItem("Call") { callSelected() }
         }
@@ -383,6 +386,13 @@ class ConversationListActivity : Activity() {
         }
         items += MenuItem("Settings") { openSettings() }
         menuSheet.show(items)
+    }
+
+    private fun markUnread(row: ThreadRow) {
+        Async.run(
+            background = { SmsStore.markThreadUnread(this, row.threadId) },
+            onResult = { loadMessages() },
+        )
     }
 
     private fun markRead(row: ThreadRow) {

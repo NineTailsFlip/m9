@@ -20,6 +20,7 @@ import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
 import java.time.LocalDate
+import life.furrer.m9.compose.ComposeActivity
 import life.furrer.m9.core.Prefs
 import life.furrer.m9.sms.MessageNotifications
 import life.furrer.m9.sms.SmsSender
@@ -214,7 +215,7 @@ class ConversationActivity : Activity() {
             // "2 messages" is the difference between one charge and two, and it's the only place
             // that can warn before the message goes out. Silent for an ordinary short message.
             val segments = segmentLabel(composeField.text.toString())
-            hintBar.setText(if (segments.isEmpty()) "call send · ‹ back to messages" else "$segments · call send")
+            hintBar.setText(if (segments.isEmpty()) "ok send · ‹ back to messages" else "$segments · ok send")
             return
         }
         hintBar.setText(if (canCall()) "* menu · ↓ reply · call ring" else "* menu · ↓ reply")
@@ -263,29 +264,7 @@ class ConversationActivity : Activity() {
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
         if (menuSheet.handleKeyDown(keyCode, event)) return true
 
-        // While composing, the field owns every key except the few that navigate out of it or
-        // send — otherwise typing a "2" would move the list selection instead of typing.
-        if (composing) {
-            when (keyCode) {
-                KeyEvent.KEYCODE_BACK -> {
-                    stopComposing()
-                    return true
-                }
-                KeyEvent.KEYCODE_CALL, KeyEvent.KEYCODE_POUND -> {
-                    sendComposed()
-                    return true
-                }
-                KeyEvent.KEYCODE_DPAD_UP -> {
-                    // Only leaves the field when there's nothing typed; mid-message, Up belongs
-                    // to the text cursor.
-                    if (composeField.text.isEmpty()) {
-                        stopComposing()
-                        return true
-                    }
-                }
-            }
-            return super.onKeyDown(keyCode, event)
-        }
+        if (composing) return super.onKeyDown(keyCode, event)
 
         when (keyCode) {
             KeyEvent.KEYCODE_DPAD_UP -> {
@@ -317,6 +296,36 @@ class ConversationActivity : Activity() {
             }
         }
         return super.onKeyDown(keyCode, event)
+    }
+
+    /** The compose field's keys are intercepted ahead of normal dispatch, not in [onKeyDown]:
+     *  a focused EditText consumes OK/ENTER (multi-line turns them into a newline), Back, and
+     *  every character key including "#", so onKeyDown — which only runs for keys no view took —
+     *  would never see any of them. Same reason `TaskEditActivity` intercepts its own inline
+     *  editors here. Confirmed on-device: without this, OK inserted a line break and the send key
+     *  fell through to the system, which opened P9's dialer instead. */
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (composing && event.action == KeyEvent.ACTION_DOWN) {
+            when (event.keyCode) {
+                KeyEvent.KEYCODE_BACK -> {
+                    stopComposing()
+                    return true
+                }
+                KeyEvent.KEYCODE_CALL, KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
+                    sendComposed()
+                    return true
+                }
+                KeyEvent.KEYCODE_DPAD_UP -> {
+                    // Only leaves the field when nothing is typed; mid-message Up belongs to the
+                    // text cursor.
+                    if (composeField.text.isEmpty()) {
+                        stopComposing()
+                        return true
+                    }
+                }
+            }
+        }
+        return super.dispatchKeyEvent(event)
     }
 
     override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
@@ -360,6 +369,10 @@ class ConversationActivity : Activity() {
             if (message.status == SendStatus.FAILED) {
                 items += MenuItem("Resend") { resend(message) }
             }
+            // Forward hands the body to the compose screen with the recipient left empty —
+            // that's the only thing a forward actually is on SMS, since there's nothing to
+            // attach and no original to quote.
+            items += MenuItem("Forward") { forward(message) }
             items += MenuItem("Delete message") { confirmDeleteMessage(message) }
         }
         if (canCall()) items += MenuItem("Call") { call() }
@@ -375,6 +388,13 @@ class ConversationActivity : Activity() {
         Async.run(
             background = { SmsSender.resend(this, uri, address, message.body) },
             onResult = { loadMessages() },
+        )
+    }
+
+    private fun forward(message: MessageRow.Entry) {
+        startActivity(
+            Intent(this, ComposeActivity::class.java)
+                .putExtra(Intent.EXTRA_TEXT, message.body),
         )
     }
 

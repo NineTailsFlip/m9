@@ -283,6 +283,20 @@ object SmsStore {
         ) > 0
     }
 
+    /** The inverse: marks a thread unread again, for someone who opened it by accident and wants
+     *  it back in their "still to deal with" list. Only READ is cleared, not SEEN — the user has
+     *  demonstrably seen that it exists, and clearing SEEN would resurrect a notification for a
+     *  message they just looked at. */
+    fun markThreadUnread(context: Context, threadId: Long): Boolean {
+        val values = ContentValues().apply { put(Telephony.Sms.READ, 0) }
+        return context.contentResolver.update(
+            Telephony.Sms.CONTENT_URI,
+            values,
+            "${Telephony.Sms.THREAD_ID} = ?",
+            arrayOf(threadId.toString()),
+        ) > 0
+    }
+
     /** Deletes every message in the thread and lets the provider retire the thread row itself.
      *  `Telephony.Threads` is never written directly — it's derived bookkeeping, and a frontend
      *  writing it is the SMS equivalent of T9 setting a sync-adapter column by hand. */
