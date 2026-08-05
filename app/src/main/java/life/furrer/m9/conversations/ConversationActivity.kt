@@ -67,7 +67,7 @@ class ConversationActivity : Activity() {
         override fun bind(view: View, index: Int, selected: Boolean) {
             bindMessageRow(view as LinearLayout, rows[index], selected)
         }
-        override fun rowHeight(index: Int): Int = messageRowHeightDp(rows[index])
+        override fun rowHeight(index: Int): Int = messageRowHeightDp(this@ConversationActivity, rows[index])
         override fun isSelectable(index: Int): Boolean = rows[index].isSelectable()
     }
 

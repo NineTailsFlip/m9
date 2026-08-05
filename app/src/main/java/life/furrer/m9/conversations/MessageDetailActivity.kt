@@ -60,7 +60,12 @@ class MessageDetailActivity : Activity() {
             setPadding(dp(SIDE_PADDING_DP), 0, dp(SIDE_PADDING_DP), dp(12))
         }
         scrollView = ScrollView(this).apply {
-            isFocusable = true
+            // Not focusable: Up/Down are handled in onKeyDown below, so the ScrollView never
+            // needs framework focus to scroll — and a focused ScrollView draws the theme's focus
+            // background, which on-device turned the whole message area grey against the rest of
+            // the suite's black.
+            isFocusable = false
+            setBackgroundColor(Palette.BLACK)
             addView(
                 LinearLayout(this@MessageDetailActivity).apply {
                     orientation = LinearLayout.VERTICAL

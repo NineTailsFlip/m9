@@ -3,6 +3,8 @@ package life.furrer.m9.conversations
 import android.content.Context
 import android.graphics.Color
 import android.graphics.Paint
+import android.text.StaticLayout
+import android.text.TextPaint
 import android.view.Gravity
 import android.view.ViewGroup
 import android.widget.LinearLayout
@@ -12,28 +14,64 @@ import life.furrer.nine.core.util.DateFmt
 
 private const val HEADER_ROW_HEIGHT_DP = 24
 private const val ROW_SIDE_PADDING_DP = 16
-private const val MESSAGE_LINE_HEIGHT_DP = 22
 private const val MESSAGE_META_HEIGHT_DP = 18
 private const val MESSAGE_TEXT_SIZE_SP = 16f
 
-/** Roughly how many characters of body fit on one line at [MESSAGE_TEXT_SIZE_SP] on a keypad
- *  phone's narrow screen. Used only to *estimate* a row's height ahead of layout, because
- *  [life.furrer.nine.core.ui.RowListView] asks for a row's height before it has a measured view
- *  to ask — an estimate that runs slightly long costs a few dp of slack, while one that runs
- *  short clips the message, so this errs low on purpose. */
-private const val CHARS_PER_LINE = 30
+/** Caps how tall one message row can get, so a pathological SMS can't fill the whole screen —
+ *  [MessageDetailActivity] is where the rest of it lives. */
 private const val MAX_LINES = 6
 
-/** Message rows are the one variable-height row in the suite: an SMS is between one and a few
- *  hundred characters, and a fixed height would either clip the long ones or waste most of the
- *  screen on the short ones (which are the common case). Estimated from the body length rather
- *  than measured, per [CHARS_PER_LINE]; [MAX_LINES] caps it so one pathological message can't
- *  fill the screen — MessageDetailActivity shows the rest. */
-fun messageRowHeightDp(row: MessageRow): Int = when (row) {
+/** A couple of dp of headroom under the text, because a `TextView` laid out at exactly its
+ *  `StaticLayout` height still clips descenders on the last line on this hardware — the same
+ *  class of off-by-a-few-pixels clipping `CallLogRowRenderer`'s own 56dp-not-48dp comment
+ *  documents for its two-line row. */
+private const val VERTICAL_SLACK_DP = 4
+
+/** Measures message bodies the way they'll actually be drawn.
+ *
+ *  Row heights have to be known before layout — [life.furrer.nine.core.ui.RowListView.
+ *  recomputeRowTops] asks the binder for every row's height up front — so the first version of
+ *  this estimated wrapped lines from body length at an assumed characters-per-line. That was
+ *  badly wrong on real messages, confirmed on-device: a Supercard login-code SMS rendered as one
+ *  clipped half-line with the rest of the message simply gone, because "Supercard Login Code:"
+ *  alone already fills this screen's width at 16sp — nowhere near the 30 characters the estimate
+ *  assumed.
+ *
+ *  So it measures instead of guessing: a [StaticLayout] over the real text, with the real paint
+ *  (taken from a probe `TextView`, so the theme's monospace-or-not setting is honoured) at the
+ *  real available width. The paint is cached per [Context] — one probe `TextView` per Activity
+ *  instance rather than per row, since a thread's worth of rows is re-measured on every provider
+ *  change — and re-derived whenever the Context changes, which is what a theme switch produces. */
+private class MessageMeasurer(context: Context) {
+    private val paint = TextPaint(TextView(context).apply { textSize = MESSAGE_TEXT_SIZE_SP }.paint)
+
+    /** The screen's width, not the list view's: `RowListView` fills the window horizontally, and
+     *  its own measured width isn't known yet at the point row heights are asked for. */
+    private val widthPx = (context.resources.displayMetrics.widthPixels - 2 * dp(context, ROW_SIDE_PADDING_DP)).coerceAtLeast(1)
+
+    /** Height in px of [text] as it will actually wrap, clamped to [MAX_LINES]. */
+    fun textHeightPx(text: String): Int {
+        val layout = StaticLayout.Builder.obtain(text, 0, text.length, paint, widthPx).build()
+        val lines = layout.lineCount.coerceIn(1, MAX_LINES)
+        return layout.getLineBottom(lines - 1)
+    }
+}
+
+private var cachedMeasurer: Pair<Context, MessageMeasurer>? = null
+
+private fun measurer(context: Context): MessageMeasurer {
+    cachedMeasurer?.let { (cachedContext, measurer) -> if (cachedContext === context) return measurer }
+    return MessageMeasurer(context).also { cachedMeasurer = context to it }
+}
+
+/** Message rows are the one genuinely variable-height row in the suite: an SMS is anywhere
+ *  between one line and a few hundred characters, and a fixed height would either clip the long
+ *  ones or waste most of a small screen on the short ones (which are the common case). */
+fun messageRowHeightDp(context: Context, row: MessageRow): Int = when (row) {
     is MessageRow.DayHeader -> HEADER_ROW_HEIGHT_DP
     is MessageRow.Entry -> {
-        val lines = (row.body.length / CHARS_PER_LINE + 1).coerceIn(1, MAX_LINES)
-        lines * MESSAGE_LINE_HEIGHT_DP + MESSAGE_META_HEIGHT_DP
+        val textDp = pxToDp(context, measurer(context).textHeightPx(row.body))
+        textDp + MESSAGE_META_HEIGHT_DP + VERTICAL_SLACK_DP
     }
 }
 
@@ -103,3 +141,8 @@ private fun bindMessage(container: LinearLayout, row: MessageRow.Entry, selected
 private fun dp(context: Context, value: Int): Int = android.util.TypedValue.applyDimension(
     android.util.TypedValue.COMPLEX_UNIT_DIP, value.toFloat(), context.resources.displayMetrics
 ).toInt()
+
+/** The inverse of [dp] — row heights are declared in dp (RowListView converts them back), but
+ *  text measurement answers in px. */
+private fun pxToDp(context: Context, px: Int): Int =
+    (px / context.resources.displayMetrics.density).toInt()
