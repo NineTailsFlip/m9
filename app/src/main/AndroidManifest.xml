@@ -26,8 +26,7 @@
         android:allowBackup="true">
 
         <!-- M9's only launcher entry (single-surface, like P9/T9 — see M9Application.kt/
-             P9Application.kt, the template this follows). Becomes the conversation list once
-             M2 lands; for M1 it's a placeholder that shows Settings/Manual only. -->
+             P9Application.kt, the template this follows). -->
         <activity
             android:name=".conversations.ConversationListActivity"
             android:exported="true"
@@ -39,6 +38,16 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name=".conversations.ConversationActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Nine" />
+
+        <activity
+            android:name=".conversations.MessageDetailActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Nine" />
 
         <activity
             android:name=".settings.SettingsActivity"
