@@ -8,6 +8,7 @@ import android.app.Person
 import android.content.Context
 import life.furrer.m9.R
 import life.furrer.m9.conversations.ConversationActivity
+import life.furrer.m9.core.Prefs
 
 private const val CHANNEL_INCOMING = "incoming_messages"
 private const val CHANNEL_MMS = "unsupported_mms"
@@ -22,8 +23,8 @@ private const val NOTIFICATION_ID_MMS = 1
  *
  *  Deliberately *not* a full-screen intent, unlike P9's ringing notification: a text message is
  *  not a call, and taking over the screen for one would be wrong on a phone that lives in a
- *  pocket. M6 grows this into a real MessagingStyle conversation with history; M3 needs it to
- *  reliably say "something arrived, here's who from". */
+ *  pocket. One notification per thread, so a talkative correspondent updates theirs instead of
+ *  stacking; opening the conversation retires it. */
 object MessageNotifications {
 
     fun ensureChannels(context: Context) {
@@ -45,8 +46,11 @@ object MessageNotifications {
 
         val contactName = SmsStore.lookupContactName(context, address)
         val sender = Person.Builder().setName(contactName ?: address).build()
+        // Who it's from is never hidden — that's what makes the notification worth having at all,
+        // and it's already on the lock screen of every phone. Only the text is optional.
+        val shown = if (Prefs.showMessageInNotification(context)) body else "New message"
         val style = Notification.MessagingStyle(Person.Builder().setName("You").build())
-            .addMessage(body, System.currentTimeMillis(), sender)
+            .addMessage(shown, System.currentTimeMillis(), sender)
 
         val openThread = PendingIntent.getActivity(
             context,

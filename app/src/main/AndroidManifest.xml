@@ -20,6 +20,9 @@
     <uses-permission android:name="android.permission.RECEIVE_MMS" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.SEND_SMS" />
+    <!-- Only to name the SIMs in Settings' "SIM for sending" row on a dual-SIM phone. Requested
+         at runtime alongside the rest; denying it costs that one row and nothing else. -->
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
 
     <!-- required="false", the same call P9's manifest makes and for the same reason: M9 still
          installs (if uselessly) on a telephony-less device rather than being filtered out of the

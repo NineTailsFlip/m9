@@ -162,6 +162,7 @@ class ConversationListActivity : Activity() {
                 Manifest.permission.READ_CONTACTS,
                 Manifest.permission.RECEIVE_SMS,
                 Manifest.permission.POST_NOTIFICATIONS,
+                Manifest.permission.READ_PHONE_STATE,
             ),
             REQUEST_SMS_PERMISSIONS,
         )

@@ -17,7 +17,29 @@ private const val MESSAGES_TO_LOAD_STEP = 100
  *  sending, delivery reports, the notification privacy toggle — needs code that doesn't exist
  *  until M3/M4/M6, and each row lands with the milestone that makes it mean something. Theme,
  *  Backup and About come free from :core. */
+/** One SIM the user can pick to send from. Only ever offered when there is more than one — a
+ *  single-SIM phone has no interesting answer, and a row whose only value is "the only SIM" is
+ *  a row that shouldn't exist. */
+private data class SendingSim(val subscriptionId: Int, val label: String)
+
 class SettingsActivity : NineSettingsActivity() {
+
+    /** Reads the live subscription list rather than caching it: a SIM can be added, removed or
+     *  disabled while M9 is installed, and a stale id would silently send from the wrong one. */
+    private fun sendingSimOptions(): List<SendingSim> {
+        if (checkSelfPermission(android.Manifest.permission.READ_PHONE_STATE) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            return emptyList()
+        }
+        val manager = getSystemService(android.telephony.SubscriptionManager::class.java) ?: return emptyList()
+        val active = manager.activeSubscriptionInfoList.orEmpty()
+        if (active.size < 2) return emptyList()
+        return active.map { info ->
+            SendingSim(
+                subscriptionId = info.subscriptionId,
+                label = info.displayName?.toString()?.takeIf { it.isNotBlank() } ?: "SIM ${info.simSlotIndex + 1}",
+            )
+        }
+    }
     override fun buildAppSections(screen: SettingsScreen, surface: NineSurface) {
         screen.section("Messages") {
             // The role's permanent home, once first run has asked once and stopped asking. Shows
@@ -31,6 +53,23 @@ class SettingsActivity : NineSettingsActivity() {
                         startActivity(SmsRole.requestIntent(this@SettingsActivity))
                     }
                 },
+            )
+            choice(
+                label = "SIM for sending",
+                options = { sendingSimOptions() },
+                get = {
+                    val current = Prefs.sendingSubscriptionId(this@SettingsActivity)
+                    sendingSimOptions().firstOrNull { it.subscriptionId == current }
+                },
+                set = { sim -> Prefs.setSendingSubscriptionId(this@SettingsActivity, sim?.subscriptionId ?: Prefs.NO_SUBSCRIPTION_PREFERENCE) },
+                render = { it.label },
+                nullLabel = "system default",
+                emptyLabel = "one SIM only",
+            )
+            toggle(
+                label = "Show message text in notifications",
+                get = { Prefs.showMessageInNotification(this@SettingsActivity) },
+                set = { value -> Prefs.setShowMessageInNotification(this@SettingsActivity, value) },
             )
             toggle(
                 label = "Delivery reports",

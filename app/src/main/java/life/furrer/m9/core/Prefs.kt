@@ -44,7 +44,18 @@ object Prefs {
         NinePrefs.of(context).edit().putInt(KEY_SENDING_SUBSCRIPTION_ID, value).apply()
     }
 
+    /** Whether a notification may show the message text, or only who it's from. A phone that
+     *  lives face-up on a table has a real answer to this, and it isn't the same for everyone —
+     *  default on, matching every other messaging app, but one row away from off. */
+    fun showMessageInNotification(context: Context): Boolean =
+        NinePrefs.of(context).getBoolean(KEY_SHOW_MESSAGE_IN_NOTIFICATION, true)
+
+    fun setShowMessageInNotification(context: Context, value: Boolean) {
+        NinePrefs.of(context).edit().putBoolean(KEY_SHOW_MESSAGE_IN_NOTIFICATION, value).apply()
+    }
+
     const val NO_SUBSCRIPTION_PREFERENCE = -1
+    private const val KEY_SHOW_MESSAGE_IN_NOTIFICATION = "show_message_in_notification"
     private const val KEY_DELIVERY_REPORTS = "delivery_reports"
     private const val KEY_SENDING_SUBSCRIPTION_ID = "sending_subscription_id"
 }
