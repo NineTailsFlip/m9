@@ -1,9 +1,42 @@
 package life.furrer.m9.conversations
 
 import android.provider.Telephony
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.format.TextStyle
+import java.util.Locale
 import life.furrer.m9.sms.SmsMessage
 import life.furrer.m9.sms.isNumericAddress
+import life.furrer.nine.core.util.DateFmt
 import life.furrer.nine.core.util.StringMatch
+
+private val OLDER_DATE_FORMAT = DateTimeFormatter.ofPattern("dd.MM.", Locale.getDefault())
+private val OTHER_YEAR_FORMAT = DateTimeFormatter.ofPattern("dd.MM.yy", Locale.getDefault())
+
+/** How many days back still get a weekday name rather than a date. Six, not seven, so the label
+ *  is never ambiguous: "WED" a full week ago would read as the Wednesday just gone. */
+private const val WEEKDAY_LABEL_DAYS = 6
+
+/** The trailing timestamp on a conversation row: the time for today's threads, a weekday name for
+ *  the last few days, a date beyond that — and a date carrying the year once it's a different one.
+ *
+ *  This exists because the conversation list, unlike every other time-ordered list in the suite,
+ *  has no day headers to supply the date: a thread is one row, and its rows span whatever dates
+ *  the conversations happened on. Confirmed on-device that always showing the time (what this
+ *  first shipped as) makes a correctly-sorted list look broken — 19:49 above 11:04 above 14:52
+ *  reads as unsorted until you realise those are three different days. */
+fun formatThreadTimestamp(date: Long, today: LocalDate, zone: ZoneId = ZoneId.systemDefault()): String {
+    val day = Instant.ofEpochMilli(date).atZone(zone).toLocalDate()
+    return when {
+        day == today -> DateFmt.formatTime(date)
+        day.year != today.year -> day.format(OTHER_YEAR_FORMAT)
+        day.isAfter(today.minusDays(WEEKDAY_LABEL_DAYS.toLong() + 1)) && day.isBefore(today) ->
+            day.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.getDefault()).uppercase()
+        else -> day.format(OLDER_DATE_FORMAT)
+    }
+}
 
 /** One row of the conversation list: a whole thread, collapsed to its newest message.
  *

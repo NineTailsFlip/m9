@@ -1,9 +1,12 @@
 package life.furrer.m9.conversations
 
 import android.provider.Telephony
+import java.time.LocalDate
+import java.time.ZoneId
 import life.furrer.m9.sms.SmsMessage
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -137,6 +140,53 @@ class ThreadRowsTest {
         val rows = buildThreadRows(listOf(message(id = 1, threadId = 1, address = "079123", date = 100)))
         assertEquals("079123", rows.single().title)
     }
+
+    // The timestamp label — the bug a real message store caught: a correctly-sorted list looks
+    // unsorted when every row shows only a time-of-day.
+
+    @Test
+    fun `today's thread shows the time, older ones do not`() {
+        val today = LocalDate.of(2026, 8, 5)
+        val zone = ZoneId.of("Europe/Zurich")
+
+        assertEquals("19:49", formatThreadTimestamp(at(2026, 8, 5, 19, 49, zone), today, zone))
+        assertNotEquals("11:04", formatThreadTimestamp(at(2026, 8, 4, 11, 4, zone), today, zone))
+    }
+
+    @Test
+    fun `the last few days show a weekday name`() {
+        val today = LocalDate.of(2026, 8, 5)
+        val zone = ZoneId.of("Europe/Zurich")
+
+        // 2026-08-04 was a Tuesday.
+        assertEquals("TUE", formatThreadTimestamp(at(2026, 8, 4, 11, 4, zone), today, zone))
+        // Six days back is still a weekday name; seven would be ambiguous with the day just gone,
+        // so it becomes a date instead. (2026-08-05 is itself a Wednesday, which makes 07-30 the
+        // Thursday six days earlier — the exact pair that would collide at a seven-day window.)
+        assertEquals("THU", formatThreadTimestamp(at(2026, 7, 30, 9, 0, zone), today, zone))
+        assertEquals("29.07.", formatThreadTimestamp(at(2026, 7, 29, 9, 0, zone), today, zone))
+    }
+
+    @Test
+    fun `a different year carries the year`() {
+        val today = LocalDate.of(2026, 8, 5)
+        val zone = ZoneId.of("Europe/Zurich")
+
+        assertEquals("31.12.25", formatThreadTimestamp(at(2025, 12, 31, 23, 0, zone), today, zone))
+    }
+
+    @Test
+    fun `a future-dated message is never mistaken for today`() {
+        val today = LocalDate.of(2026, 8, 5)
+        val zone = ZoneId.of("Europe/Zurich")
+
+        // A wrong device clock or a network-supplied timestamp can produce one; it must not fall
+        // into the weekday window either, which only looks backwards.
+        assertEquals("06.08.", formatThreadTimestamp(at(2026, 8, 6, 9, 0, zone), today, zone))
+    }
+
+    private fun at(year: Int, month: Int, day: Int, hour: Int, minute: Int, zone: ZoneId): Long =
+        LocalDate.of(year, month, day).atTime(hour, minute).atZone(zone).toInstant().toEpochMilli()
 
     @Test
     fun `an empty query matches everything`() {

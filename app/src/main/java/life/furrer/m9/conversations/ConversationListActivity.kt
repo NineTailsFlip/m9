@@ -313,9 +313,14 @@ class ConversationListActivity : Activity() {
         }
     }
 
+    /** Resets the selection to the top, unlike a plain [rebuildRows]. Confirmed on-device that
+     *  keeping the index across a filter change lands somewhere arbitrary — toggling to unread-
+     *  only while sitting on row 7 of 9 clamps to the last of the 5 that survive, so the newest
+     *  unread thread (the whole reason for the filter) ends up off the top of the selection. */
     private fun toggleUnreadOnly() {
         unreadOnly = !unreadOnly
         rebuildRows()
+        rowListView.selectFirstSelectable()
     }
 
     private fun selectedRow(): ThreadRow? = rows.getOrNull(rowListView.selectedIndex)
