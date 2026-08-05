@@ -6,10 +6,15 @@
          permission prompt is a scary, unexplainable ask, and M9's permission story is one it has
          to be able to explain in a sentence.
 
-         Two absences are deliberate and permanent. WRITE_CONTACTS: M9 reads the address book and
-         never writes it, exactly like P9 — which is also why it registers no ContactsActions with
-         :contacts. CALL_PHONE: the call key hands off with ACTION_DIAL, so a messaging app never
-         holds the permission to place a call itself.
+         WRITE_CONTACTS is absent and stays absent: M9 reads the address book and never writes
+         it, exactly like P9 — which is also why it registers no ContactsActions with :contacts.
+
+         CALL_PHONE was absent for a while, on the reasoning that a messaging app has no business
+         placing calls and ACTION_DIAL (which hands off to a dialer with the number filled in) is
+         enough. That was overruled by use: the call key inside a conversation should call the
+         person you're reading, in one press, not open another app for you to press again. It's
+         requested at runtime, only when the call key is actually used, and denying it costs
+         nothing else in the app.
 
          There is no INTERNET permission either, and that is not an oversight — SMS goes over the
          radio via SmsManager, and even MMS, when it eventually lands, is carried by the platform's
@@ -23,6 +28,7 @@
     <!-- Only to name the SIMs in Settings' "SIM for sending" row on a dual-SIM phone. Requested
          at runtime alongside the rest; denying it costs that one row and nothing else. -->
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+    <uses-permission android:name="android.permission.CALL_PHONE" />
 
     <!-- required="false", the same call P9's manifest makes and for the same reason: M9 still
          installs (if uselessly) on a telephony-less device rather than being filtered out of the

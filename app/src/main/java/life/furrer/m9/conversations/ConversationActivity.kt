@@ -41,6 +41,7 @@ import life.furrer.nine.core.ui.hideStatusBar
 import life.furrer.nine.core.util.Async
 
 private const val SIDE_PADDING_DP = 16
+private const val REQUEST_CALL_PHONE_PERMISSION = 101
 
 /** One thread: every message with its correspondent, oldest at the top.
  *
@@ -63,6 +64,7 @@ class ConversationActivity : Activity() {
     private var contactName: String? = null
     private var rows: List<MessageRow> = emptyList()
 
+    private var pendingCallNumber: String? = null
     private var pendingStarKeyCode: Int? = null
     private var starLongPressHandled = false
 
@@ -410,7 +412,35 @@ class ConversationActivity : Activity() {
 
     private fun call() {
         if (!canCall()) return
-        startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:$address")))
+        placeCallOrRequestPermission(address)
+    }
+
+    /** Places the call itself rather than handing off to a dialer with the number filled in. The
+     *  call key inside a conversation means "call the person I'm reading", and making that two
+     *  presses in two apps is one too many.
+     *
+     *  Asks for CALL_PHONE the first time it's used rather than at first run, the same
+     *  request-when-needed shape `ContactsActivity.placeCallOrRequestPermission` uses: someone who
+     *  only ever texts is never asked for it at all. */
+    private fun placeCallOrRequestPermission(number: String) {
+        if (checkSelfPermission(android.Manifest.permission.CALL_PHONE) == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            startActivity(Intent(Intent.ACTION_CALL, Uri.parse("tel:$number")))
+        } else {
+            pendingCallNumber = number
+            requestPermissions(arrayOf(android.Manifest.permission.CALL_PHONE), REQUEST_CALL_PHONE_PERMISSION)
+        }
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode != REQUEST_CALL_PHONE_PERMISSION) return
+        val number = pendingCallNumber
+        pendingCallNumber = null
+        if (number != null &&
+            checkSelfPermission(android.Manifest.permission.CALL_PHONE) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            startActivity(Intent(Intent.ACTION_CALL, Uri.parse("tel:$number")))
+        }
     }
 
     private fun openMenu() {

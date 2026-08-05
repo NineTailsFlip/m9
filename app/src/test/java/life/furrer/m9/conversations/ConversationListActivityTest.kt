@@ -99,13 +99,18 @@ class ConversationListActivityTest {
     }
 
     @Test
-    fun `the call key dials a numeric sender and ignores an alphanumeric one`() {
+    fun `the call key places the call itself rather than handing off to a dialer`() {
+        // ACTION_CALL, not ACTION_DIAL: the call key inside messages means "call this person",
+        // and opening a dialer for a second press is one press too many.
+        shadowOf(context).grantPermissions(android.Manifest.permission.CALL_PHONE)
         FakeSmsProvider.putMessage(1L, threadId = 1L, address = "079123", body = "hi", date = 100L)
         val activity = Robolectric.buildActivity(ConversationListActivity::class.java).setup().get()
         settle()
 
         tap(activity, KeyEvent.KEYCODE_CALL)
-        assertEquals("tel:079123", shadowOf(activity).nextStartedActivity.data.toString())
+        val started = shadowOf(activity).nextStartedActivity
+        assertEquals(android.content.Intent.ACTION_CALL, started.action)
+        assertEquals("tel:079123", started.data.toString())
 
         FakeSmsProvider.reset()
         FakeSmsProvider.putMessage(2L, threadId = 2L, address = "Migros", body = "code", date = 200L)
@@ -116,6 +121,31 @@ class ConversationListActivityTest {
         // Nothing started at all — an alphanumeric sender is not a number, and the call key must
         // not invent one.
         assertEquals(null, shadowOf(shopActivity).nextStartedActivity)
+    }
+
+    @Test
+    fun `without CALL_PHONE the call key asks for it instead of dialling`() {
+        // The permission is requested when the key is first used, not at first run — someone who
+        // only ever texts is never asked for it. What must not happen is a keypress that silently
+        // does nothing.
+        shadowOf(context).denyPermissions(android.Manifest.permission.CALL_PHONE)
+        FakeSmsProvider.putMessage(1L, threadId = 1L, address = "079123", body = "hi", date = 100L)
+        val activity = Robolectric.buildActivity(ConversationListActivity::class.java).setup().get()
+        settle()
+
+        tap(activity, KeyEvent.KEYCODE_CALL)
+
+        assertTrue(
+            shadowOf(activity).lastRequestedPermission.requestedPermissions
+                .contains(android.Manifest.permission.CALL_PHONE),
+        )
+        // No call went out in the meantime. (The permission request is itself an started
+        // activity under Robolectric, so this asserts on the action rather than on nothing
+        // having started.)
+        assertFalse(
+            generateSequence { shadowOf(activity).nextStartedActivity }
+                .any { it.action == android.content.Intent.ACTION_CALL },
+        )
     }
 
     @Test

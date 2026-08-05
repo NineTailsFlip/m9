@@ -37,6 +37,7 @@ import life.furrer.nine.core.ui.hideStatusBar
 import life.furrer.nine.core.util.Async
 
 private const val REQUEST_SMS_PERMISSIONS = 100
+private const val REQUEST_CALL_PHONE_PERMISSION = 101
 private const val SIDE_PADDING_DP = 16
 
 /** Reserved exactly as `ContactsActivity` reserves them, and for the reason its own comment
@@ -72,6 +73,7 @@ class ConversationListActivity : Activity() {
         starLongPressFired = true
         openSettings()
     }
+    private var pendingCallNumber: String? = null
     private var menuConsumedKeyUp: Int? = null
     private val seenKeyDowns = mutableSetOf<Int>()
 
@@ -226,6 +228,10 @@ class ConversationListActivity : Activity() {
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == REQUEST_CALL_PHONE_PERMISSION) {
+            onCallPermissionResult()
+            return
+        }
         if (requestCode != REQUEST_SMS_PERMISSIONS) return
         if (hasNeededPermissions()) {
             permissionScreen.hide()
@@ -358,15 +364,41 @@ class ConversationListActivity : Activity() {
         startActivity(ConversationActivity.intentFor(this, row.threadId, row.address, row.displayName))
     }
 
-    /** The call key dials the selected thread's correspondent — the single most likely thing to
-     *  want next after reading a message. Silently does nothing for an alphanumeric sender, which
-     *  is not a number and cannot be called (see `ThreadRow.canCall`). ACTION_DIAL rather than
-     *  ACTION_CALL: it hands off to whatever dialer holds the role with the number pre-filled, so
-     *  M9 never needs CALL_PHONE — a permission a messaging app has no business holding. */
+    /** The call key calls the selected thread's correspondent — the single most likely thing to
+     *  want next after reading a message. Placed directly rather than handed to a dialer, matching
+     *  the conversation screen: the same key on two adjacent screens must not mean two different
+     *  things. Silently does nothing for an alphanumeric sender, which is not a number and cannot
+     *  be called (see `ThreadRow.canCall`). */
     private fun callSelected() {
         val row = selectedRow() ?: return
         if (!row.canCall) return
-        startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:${row.address}")))
+        placeCallOrRequestPermission(row.address)
+    }
+
+    /** Places the call itself rather than handing off to a dialer with the number filled in. The
+     *  call key inside a conversation means "call the person I'm reading", and making that two
+     *  presses in two apps is one too many.
+     *
+     *  Asks for CALL_PHONE the first time it's used rather than at first run, the same
+     *  request-when-needed shape `ContactsActivity.placeCallOrRequestPermission` uses: someone who
+     *  only ever texts is never asked for it at all. */
+    private fun placeCallOrRequestPermission(number: String) {
+        if (checkSelfPermission(android.Manifest.permission.CALL_PHONE) == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            startActivity(Intent(Intent.ACTION_CALL, Uri.parse("tel:$number")))
+        } else {
+            pendingCallNumber = number
+            requestPermissions(arrayOf(android.Manifest.permission.CALL_PHONE), REQUEST_CALL_PHONE_PERMISSION)
+        }
+    }
+
+    private fun onCallPermissionResult() {
+        val number = pendingCallNumber
+        pendingCallNumber = null
+        if (number != null &&
+            checkSelfPermission(android.Manifest.permission.CALL_PHONE) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            startActivity(Intent(Intent.ACTION_CALL, Uri.parse("tel:$number")))
+        }
     }
 
     private fun openMenu() {
