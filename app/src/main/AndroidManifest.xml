@@ -1,23 +1,25 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Exactly what M2 can actually do: read the message store, and resolve an address to a
-         contact name. Each milestone's manifest reflects the app's real abilities — an unused
-         SMS permission prompt is a scary, unexplainable ask, and M9's whole permission story is
-         one it has to be able to explain. RECEIVE_SMS/SEND_SMS/RECEIVE_MMS/POST_NOTIFICATIONS/
-         READ_PHONE_STATE and the four ROLE_SMS components (SMS_DELIVER receiver,
-         WAP_PUSH_DELIVER receiver, the smsto: activity filter, HeadlessSmsSendService) arrive
-         with M3/M4, when there is code behind them. WRITE_CONTACTS is never declared: M9 reads
-         the address book and never writes it, exactly like P9. -->
+    <!-- Exactly what M9 can actually do, and nothing declared ahead of code that uses it: read
+         the message store, resolve an address to a contact name, receive SMS and MMS while it
+         holds ROLE_SMS, send, and notify. Each milestone added only its own — an unused SMS
+         permission prompt is a scary, unexplainable ask, and M9's permission story is one it has
+         to be able to explain in a sentence.
+
+         Two absences are deliberate and permanent. WRITE_CONTACTS: M9 reads the address book and
+         never writes it, exactly like P9 — which is also why it registers no ContactsActions with
+         :contacts. CALL_PHONE: the call key hands off with ACTION_DIAL, so a messaging app never
+         holds the permission to place a call itself.
+
+         There is no INTERNET permission either, and that is not an oversight — SMS goes over the
+         radio via SmsManager, and even MMS, when it eventually lands, is carried by the platform's
+         own MMS service rather than a socket M9 opens. -->
     <uses-permission android:name="android.permission.READ_SMS" />
     <uses-permission android:name="android.permission.READ_CONTACTS" />
     <uses-permission android:name="android.permission.RECEIVE_SMS" />
     <uses-permission android:name="android.permission.RECEIVE_MMS" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <!-- SEND_SMS is deliberately absent until M4, when there is code that sends. -->
-
-    <!-- Never CALL_PHONE: the call key hands off with ACTION_DIAL, so a messaging app never holds
-         the permission to place a call itself. -->
-    <!-- Never WRITE_CONTACTS: M9 reads the address book and never writes it, like P9. -->
+    <uses-permission android:name="android.permission.SEND_SMS" />
 
     <!-- required="false", the same call P9's manifest makes and for the same reason: M9 still
          installs (if uselessly) on a telephony-less device rather than being filtered out of the
@@ -103,6 +105,12 @@
                 <data android:mimeType="application/vnd.wap.mms-message" />
             </intent-filter>
         </receiver>
+
+        <!-- Not exported: it only ever receives the PendingIntent broadcasts SmsSender itself
+             creates, so nothing outside M9 has any business reaching it. -->
+        <receiver
+            android:name=".sms.SmsResultReceiver"
+            android:exported="false" />
 
         <service
             android:name=".sms.HeadlessSmsSendService"

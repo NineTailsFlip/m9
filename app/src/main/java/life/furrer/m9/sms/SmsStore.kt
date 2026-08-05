@@ -224,6 +224,48 @@ object SmsStore {
         return context.contentResolver.insert(Telephony.Sms.Inbox.CONTENT_URI, values)
     }
 
+    /** Stores an outgoing message in the outbox *before* it is handed to the radio, so a crash or
+     *  a kill mid-send leaves a visible message the user can resend rather than nothing at all.
+     *  [SmsSender] moves the row on from here as results arrive.
+     *
+     *  Outbound rows are stored read and seen: the user wrote it, so there is nothing to notify
+     *  them about and it must never count toward a thread's unread badge. */
+    fun insertOutbox(
+        context: Context,
+        threadId: Long,
+        address: String,
+        body: String,
+        subscriptionId: Int,
+    ): Uri? {
+        val values = ContentValues().apply {
+            put(Telephony.Sms.THREAD_ID, threadId)
+            put(Telephony.Sms.ADDRESS, address)
+            put(Telephony.Sms.BODY, body)
+            put(Telephony.Sms.DATE, System.currentTimeMillis())
+            put(Telephony.Sms.TYPE, Telephony.Sms.MESSAGE_TYPE_OUTBOX)
+            put(Telephony.Sms.STATUS, Telephony.Sms.STATUS_NONE)
+            put(Telephony.Sms.READ, 1)
+            put(Telephony.Sms.SEEN, 1)
+            put(Telephony.Sms.SUBSCRIPTION_ID, subscriptionId)
+        }
+        return context.contentResolver.insert(Telephony.Sms.Sent.CONTENT_URI, values)
+    }
+
+    /** Moves a message between the states of a send. The provider row is the source of truth for
+     *  a send's outcome (docs/m9-plan.md §7) — a result can arrive minutes after the screen that
+     *  started it is gone, so nothing about it is ever held in an Activity field.
+     *
+     *  Note the deliberate separation of TYPE and STATUS: a *sent* message whose delivery report
+     *  came back negative stays `MESSAGE_TYPE_SENT` with `STATUS_FAILED`, because the send did
+     *  work and only the delivery didn't — [sendStatusOf] is what reads the pair back. */
+    fun updateSendState(context: Context, uri: Uri, type: Int, status: Int? = null): Boolean {
+        val values = ContentValues().apply {
+            put(Telephony.Sms.TYPE, type)
+            if (status != null) put(Telephony.Sms.STATUS, status)
+        }
+        return context.contentResolver.update(uri, values, null, null) > 0
+    }
+
     /** READ and SEEN are different columns and both matter: SEEN is "the user knows this exists"
      *  (cleared by a notification being shown), READ is "the user has opened it". Opening a
      *  thread satisfies both, so this sets both — a thread marked READ but not SEEN would keep

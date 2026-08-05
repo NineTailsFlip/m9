@@ -32,6 +32,11 @@ class SettingsActivity : NineSettingsActivity() {
                     }
                 },
             )
+            toggle(
+                label = "Delivery reports",
+                get = { Prefs.deliveryReports(this@SettingsActivity) },
+                set = { value -> Prefs.setDeliveryReports(this@SettingsActivity, value) },
+            )
             intRange(
                 label = "Messages to load",
                 min = MIN_MESSAGES_TO_LOAD,

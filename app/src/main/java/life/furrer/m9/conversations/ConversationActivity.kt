@@ -1,6 +1,7 @@
 package life.furrer.m9.conversations
 
 import android.app.Activity
+import android.content.ContentUris
 import android.content.Context
 import android.content.Intent
 import android.database.ContentObserver
@@ -9,16 +10,21 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.provider.Telephony
+import android.text.InputType
+import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
+import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
 import java.time.LocalDate
 import life.furrer.m9.core.Prefs
 import life.furrer.m9.sms.MessageNotifications
+import life.furrer.m9.sms.SmsSender
 import life.furrer.m9.sms.SmsStore
+import life.furrer.m9.sms.segmentLabel
 import life.furrer.m9.sms.isNumericAddress
 import life.furrer.nine.core.Nine
 import life.furrer.nine.core.settings.NineSettingsActivity
@@ -44,9 +50,10 @@ private const val SIDE_PADDING_DP = 16
  *  a focused field behind an open menu) needs a focused field to happen at all. It's also why
  *  M5's multi-number chooser will belong on the compose screen rather than inside the picker.
  *
- *  M2 is read-only: the compose row the plan puts at the bottom of this screen, and the actions
- *  that write (Forward, Resend), arrive with M4/M5 once sending exists. What's here now is
- *  everything you can do to a message you can only read. */
+ *  Replying happens inline, at the bottom of this screen, rather than on a screen of its own:
+ *  it's the most common action in the app, and a screen transition per reply is a keystroke and a
+ *  lost place for nothing. Down past the last message enters the field, so it costs no key of its
+ *  own. A *new* message still gets its own screen (M5), because that one needs a recipient. */
 class ConversationActivity : Activity() {
 
     private var threadId: Long = -1L
@@ -57,7 +64,12 @@ class ConversationActivity : Activity() {
     private var pendingStarKeyCode: Int? = null
     private var starLongPressHandled = false
 
+    /** True while the compose field has focus and is taking typed characters. The list keeps its
+     *  own selection underneath, so leaving the field puts the user back exactly where they were. */
+    private var composing = false
+
     private lateinit var rowListView: RowListView
+    private lateinit var composeField: EditText
     private lateinit var hintBar: HintBar
     private lateinit var menuSheet: MenuSheet
     private var contentObserver: ContentObserver? = null
@@ -95,6 +107,27 @@ class ConversationActivity : Activity() {
             visibility = if (contactName != null) View.VISIBLE else View.GONE
         }
         rowListView = RowListView(this).apply { setBinder(binder) }
+        composeField = EditText(this).apply {
+            hint = "Reply…"
+            textSize = 16f
+            // Multi-line: an SMS wraps, and a compose box that scrolled sideways on one line
+            // would hide what you already typed.
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE
+            setTextColor(Palette.WHITE)
+            setHintTextColor(Palette.GRAY_FAINT)
+            setBackgroundColor(Palette.BLACK)
+            gravity = Gravity.START
+            setPadding(dp(SIDE_PADDING_DP), dp(6), dp(SIDE_PADDING_DP), dp(6))
+            // Focusable only while composing, so Down from the list is what enters it rather
+            // than the framework handing it focus on open and swallowing every key.
+            isFocusable = false
+            isFocusableInTouchMode = false
+            addTextChangedListener(object : android.text.TextWatcher {
+                override fun afterTextChanged(s: android.text.Editable?) = updateHint()
+                override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+                override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            })
+        }
         hintBar = HintBar(this)
         menuSheet = MenuSheet(this)
 
@@ -103,6 +136,7 @@ class ConversationActivity : Activity() {
             addView(title)
             addView(subtitle)
             addView(rowListView, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
+            addView(composeField)
             addView(hintBar)
         }
         val root = FrameLayout(this).apply {
@@ -175,7 +209,53 @@ class ConversationActivity : Activity() {
     }
 
     private fun updateHint() {
-        hintBar.setText(if (canCall()) "* menu · call ring · ok open" else "* menu · ok open")
+        if (composing) {
+            // The segment counter earns the hint bar's whole width while typing: on a prepaid SIM
+            // "2 messages" is the difference between one charge and two, and it's the only place
+            // that can warn before the message goes out. Silent for an ordinary short message.
+            val segments = segmentLabel(composeField.text.toString())
+            hintBar.setText(if (segments.isEmpty()) "call send · ‹ back to messages" else "$segments · call send")
+            return
+        }
+        hintBar.setText(if (canCall()) "* menu · ↓ reply · call ring" else "* menu · ↓ reply")
+    }
+
+    /** Down past the last message enters the compose field; Back leaves it. Focus is granted only
+     *  for as long as it's being used, because an always-focusable EditText on this screen would
+     *  take every keypress the list needs — and a focused field is also what makes a MenuSheet
+     *  unsafe over it (the IME keeps composing behind an open menu on this hardware), so the menu
+     *  is only reachable while not composing. */
+    private fun startComposing() {
+        if (composing) return
+        composing = true
+        composeField.isFocusable = true
+        composeField.isFocusableInTouchMode = true
+        composeField.requestFocus()
+        updateHint()
+    }
+
+    private fun stopComposing() {
+        if (!composing) return
+        composing = false
+        composeField.clearFocus()
+        composeField.isFocusable = false
+        composeField.isFocusableInTouchMode = false
+        updateHint()
+    }
+
+    /** Sends what's in the compose field. Empty is a no-op rather than an empty message — an SMS
+     *  with no body is a real thing the radio will happily send and nobody ever means to. */
+    private fun sendComposed() {
+        val body = composeField.text.toString().trim()
+        if (body.isEmpty()) return
+        if (address.isBlank()) return
+
+        SmsSender.send(this, threadId, address, body)
+        composeField.setText("")
+        stopComposing()
+        // The provider write is what the thread actually renders from; this just stops the list
+        // waiting on a ContentObserver tick to show what was clearly just sent.
+        loadMessages()
     }
 
     private fun canCall(): Boolean = isNumericAddress(address)
@@ -183,13 +263,39 @@ class ConversationActivity : Activity() {
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
         if (menuSheet.handleKeyDown(keyCode, event)) return true
 
+        // While composing, the field owns every key except the few that navigate out of it or
+        // send — otherwise typing a "2" would move the list selection instead of typing.
+        if (composing) {
+            when (keyCode) {
+                KeyEvent.KEYCODE_BACK -> {
+                    stopComposing()
+                    return true
+                }
+                KeyEvent.KEYCODE_CALL, KeyEvent.KEYCODE_POUND -> {
+                    sendComposed()
+                    return true
+                }
+                KeyEvent.KEYCODE_DPAD_UP -> {
+                    // Only leaves the field when there's nothing typed; mid-message, Up belongs
+                    // to the text cursor.
+                    if (composeField.text.isEmpty()) {
+                        stopComposing()
+                        return true
+                    }
+                }
+            }
+            return super.onKeyDown(keyCode, event)
+        }
+
         when (keyCode) {
             KeyEvent.KEYCODE_DPAD_UP -> {
                 rowListView.moveSelection(-1)
                 return true
             }
             KeyEvent.KEYCODE_DPAD_DOWN -> {
-                rowListView.moveSelection(1)
+                // Down past the last message is what opens the reply field — the plan's inline
+                // compose row, reached without a key of its own.
+                if (!rowListView.canMoveSelection(1)) startComposing() else rowListView.moveSelection(1)
                 return true
             }
             KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
@@ -249,12 +355,27 @@ class ConversationActivity : Activity() {
         selectedMessage()?.let { message ->
             items += MenuItem("Message details") { openSelectedMessage() }
             items += MenuItem("Copy text") { copyToClipboard(message.body) }
+            // Only for a message that actually failed — the one state that asks the user to do
+            // something about it.
+            if (message.status == SendStatus.FAILED) {
+                items += MenuItem("Resend") { resend(message) }
+            }
             items += MenuItem("Delete message") { confirmDeleteMessage(message) }
         }
         if (canCall()) items += MenuItem("Call") { call() }
         items += MenuItem("Delete conversation") { confirmDeleteThread() }
         items += MenuItem("Settings") { openSettings() }
         menuSheet.show(items)
+    }
+
+    /** Reuses the failed message's own row rather than writing a new one, so resending doesn't
+     *  leave two copies of the same message in the thread. */
+    private fun resend(message: MessageRow.Entry) {
+        val uri = ContentUris.withAppendedId(Telephony.Sms.CONTENT_URI, message.id)
+        Async.run(
+            background = { SmsSender.resend(this, uri, address, message.body) },
+            onResult = { loadMessages() },
+        )
     }
 
     private fun copyToClipboard(text: String) {
