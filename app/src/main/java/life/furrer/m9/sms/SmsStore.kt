@@ -107,7 +107,18 @@ object SmsStore {
                         id = cursor.getLong(idIndex),
                         threadId = cursor.getLong(threadIndex),
                         address = cursor.getString(addressIndex) ?: "",
-                        body = cursor.getString(bodyIndex) ?: "",
+                        // Trimmed at the boundary, so every consumer — the list snippet, the
+                        // thread row, the detail screen, search — sees the same normalized body
+                        // and none of them has to remember to do it. Senders pad messages with
+                        // leading and trailing newlines routinely; on a screen this small that
+                        // costs real, visible space, and a trailing newline is measured as a
+                        // genuine line by the thread row's own height measurement, making the row
+                        // taller than the text it holds. Internal whitespace is untouched — a
+                        // multi-line message is meant to be multi-line.
+                        //
+                        // This normalizes M9's *view* of the message, never the provider: the
+                        // stored row keeps whatever arrived over the air.
+                        body = cursor.getString(bodyIndex)?.trim() ?: "",
                         date = cursor.getLong(dateIndex),
                         dateSent = cursor.getLong(dateSentIndex),
                         type = cursor.getInt(typeIndex),

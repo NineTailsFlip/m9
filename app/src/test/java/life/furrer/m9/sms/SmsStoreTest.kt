@@ -72,6 +72,25 @@ class SmsStoreTest {
     }
 
     @Test
+    fun `queryMessages trims leading and trailing whitespace but keeps the message's own lines`() {
+        FakeSmsProvider.putMessage(
+            1L, threadId = 1L, address = "079123",
+            body = "\n\n  Your code is 4451\nValid for 5 minutes.  \n\n",
+            date = 1L,
+        )
+
+        // Both ends gone, the newline between the two real lines kept.
+        assertEquals("Your code is 4451\nValid for 5 minutes.", SmsStore.queryMessages(context, 50).single().body)
+    }
+
+    @Test
+    fun `a message that is nothing but whitespace becomes empty rather than blank lines`() {
+        FakeSmsProvider.putMessage(1L, threadId = 1L, address = "079123", body = "   \n  \n ", date = 1L)
+
+        assertEquals("", SmsStore.queryMessages(context, 50).single().body)
+    }
+
+    @Test
     fun `queryMessages returns newest first and honours the limit`() {
         FakeSmsProvider.putMessage(1L, threadId = 1L, address = "079123", body = "oldest", date = 100L)
         FakeSmsProvider.putMessage(2L, threadId = 1L, address = "079123", body = "newest", date = 300L)
