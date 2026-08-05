@@ -1,0 +1,40 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- M1 is a skeleton: it reads no SMS and sends nothing yet (docs/m9-plan.md's M1), so no
+         SMS/contacts/notification permission is declared here. Each milestone's manifest should
+         reflect what the app can actually do — READ_SMS/RECEIVE_SMS/SEND_SMS/RECEIVE_MMS/
+         READ_CONTACTS/POST_NOTIFICATIONS/READ_PHONE_STATE arrive with M2/M3, and the four
+         ROLE_SMS components (SMS_DELIVER receiver, WAP_PUSH_DELIVER receiver, the smsto: activity
+         filter, HeadlessSmsSendService) arrive with M3 — an unused SMS permission prompt this
+         early would be a scary, unexplainable ask. -->
+
+    <application
+        android:name=".M9Application"
+        android:label="@string/app_name"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher"
+        android:theme="@style/Theme.Nine"
+        android:allowBackup="true">
+
+        <!-- M9's only launcher entry (single-surface, like P9/T9 — see M9Application.kt/
+             P9Application.kt, the template this follows). Becomes the conversation list once
+             M2 lands; for M1 it's a placeholder that shows Settings/Manual only. -->
+        <activity
+            android:name=".conversations.ConversationListActivity"
+            android:exported="true"
+            android:launchMode="singleTop"
+            android:windowSoftInputMode="stateAlwaysHidden"
+            android:configChanges="keyboardHidden|orientation|screenSize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name=".settings.SettingsActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Nine" />
+
+    </application>
+</manifest>

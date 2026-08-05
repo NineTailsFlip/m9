@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Same shape as ic_launcher_foreground, single color since themed (Material You) icons are
+     tinted as one flat layer by the system regardless — the same treatment C9's/P9's own
+     monochrome variants use. Also used as the notification small icon, per the other apps'
+     CallNotifications/etc precedent, once M9 posts notifications from M3 on. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M38,28 h34 a10,10 0 0 1 10,10 v20 a10,10 0 0 1 -10,10 h-20 l-10,10 v-10 h-4 a10,10 0 0 1 -10,-10 v-20 a10,10 0 0 1 10,-10 z
+                           M55,48 m-6,0 a6,6 0 1 0 12,0 a6,6 0 1 0 -12,0" />
+</vector>
