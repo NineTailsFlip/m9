@@ -129,7 +129,9 @@ class ConversationActivity : Activity() {
         }
         composeField = EditText(this).apply {
             hint = "Reply…"
-            textSize = 16f
+            // Same size as the messages above it and as the compose screen's own field: what you
+            // are writing should look like what you are reading.
+            textSize = Prefs.fontSize(this@ConversationActivity).toFloat()
             // Multi-line: an SMS wraps, and a compose box that scrolled sideways on one line
             // would hide what you already typed.
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE
