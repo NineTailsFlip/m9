@@ -43,6 +43,13 @@ import life.furrer.nine.core.util.Async
 private const val SIDE_PADDING_DP = 16
 private const val REQUEST_CALL_PHONE_PERMISSION = 101
 
+/** The gap between the newest message and the reply box. Only visible when the thread is long
+ *  enough to reach the bottom, which is exactly when it's needed. */
+private const val COMPOSE_TOP_GAP_DP = 12
+
+/** Padding under the reply text, between it and the hint bar. */
+private const val COMPOSE_BOTTOM_PADDING_DP = 12
+
 /** One thread: every message with its correspondent, oldest at the top.
  *
  *  No [life.furrer.nine.core.ui.SearchField] here, which makes the key handling the simpler
@@ -74,6 +81,10 @@ class ConversationActivity : Activity() {
 
     private lateinit var rowListView: RowListView
     private lateinit var composeField: EditText
+
+    /** Somewhere for focus to go that isn't an EditText, so leaving the reply row doesn't leave
+     *  the window focusing nothing (see [releaseImeFocus]). */
+    private lateinit var keyFocusAnchor: View
     private lateinit var hintBar: HintBar
     private lateinit var menuSheet: MenuSheet
     private var contentObserver: ContentObserver? = null
@@ -112,6 +123,10 @@ class ConversationActivity : Activity() {
             visibility = if (contactName != null) View.VISIBLE else View.GONE
         }
         rowListView = RowListView(this).apply { setBinder(binder) }
+        keyFocusAnchor = View(this).apply {
+            isFocusable = true
+            isFocusableInTouchMode = true
+        }
         composeField = EditText(this).apply {
             hint = "Reply…"
             textSize = 16f
@@ -122,7 +137,9 @@ class ConversationActivity : Activity() {
             setHintTextColor(Palette.GRAY_FAINT)
             setBackgroundColor(Palette.BLACK)
             gravity = Gravity.START
-            setPadding(dp(SIDE_PADDING_DP), dp(6), dp(SIDE_PADDING_DP), dp(6))
+            // More room below than above: the reply box sits directly on the hint bar, and text
+            // with only a few dp under it reads as sitting on the line rather than above it.
+            setPadding(dp(SIDE_PADDING_DP), dp(6), dp(SIDE_PADDING_DP), dp(COMPOSE_BOTTOM_PADDING_DP))
             // Focusable only while composing, so Down from the list is what enters it rather
             // than the framework handing it focus on open and swallowing every key.
             isFocusable = false
@@ -138,10 +155,20 @@ class ConversationActivity : Activity() {
 
         val mainColumn = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
+            addView(keyFocusAnchor, LinearLayout.LayoutParams(0, 0))
             addView(title)
             addView(subtitle)
             addView(rowListView, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
-            addView(composeField)
+            // Breathing room above the reply box. Without it, a thread long enough to fill the
+            // screen leaves its last message touching the box you type into, and the two read as
+            // one block — the message you just received and the message you're about to write
+            // should not look like the same thing.
+            addView(
+                composeField,
+                LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                    topMargin = dp(COMPOSE_TOP_GAP_DP)
+                },
+            )
             addView(hintBar)
         }
         val root = FrameLayout(this).apply {
@@ -228,11 +255,19 @@ class ConversationActivity : Activity() {
             hintBar.setText(if (segments.isEmpty()) "ok send · ‹ back to messages" else "$segments · ok send")
             return
         }
-        // "# copy code" only appears when the selected message actually has one — a hint
-        // advertising a key that does nothing is worse than no hint, and on this screen the
-        // answer changes with every move of the selection (hence updateHint() on each).
+        // Each item appears only when its key actually does something — a hint advertising a dead
+        // key is worse than no hint — and on this screen that changes with every move of the
+        // selection, which is why updateHint() runs on each. The call key earns a slot whenever
+        // the correspondent is callable, including alongside a code: dropping it there hid the
+        // one key that reaches the person rather than the message. "call dial" is the suite's
+        // existing wording (ContactsActivity and ContactDetailActivity both use it).
         hintBar.setText(
-            if (selectedCode() != null) "# copy code · * menu · ↓ reply" else "* menu · ↓ reply · ← → day",
+            when {
+                selectedCode() != null && canCall() -> "# copy · call dial · * menu"
+                selectedCode() != null -> "# copy code · * menu · ↓ reply"
+                canCall() -> "* menu · ↓ reply · call dial"
+                else -> "* menu · ↓ reply · ← → day"
+            },
         )
     }
 
@@ -250,13 +285,37 @@ class ConversationActivity : Activity() {
         updateHint()
     }
 
+    /** Leaving the reply box needs a genuinely fresh window, not just dropped focus.
+     *
+     *  Confirmed on-device, twice: after typing in the reply row and pressing Back, "*" stopped
+     *  opening the menu at all. Once this hardware's T9 IME has had a live input connection it
+     *  goes on swallowing "*" for its own case-cycling before the event reaches dispatchKeyEvent —
+     *  the same capture `ContactsActivity` documents for its search field.
+     *
+     *  Tried first and **not sufficient**: handing focus to a non-EditText anchor,
+     *  `clearFocus()`, `hideSoftInputFromWindow`, and `restartInput` — in combination. The menu
+     *  key stayed dead. `ContactsActivity.restartFresh` records the same conclusion (and that an
+     *  in-place `recreate()` was ruled out before it), so this takes the same escape: finish and
+     *  relaunch with the identical extras, transitions suppressed so it's invisible.
+     *
+     *  The screen it comes back to is the one it would have shown anyway — the reply row sits at
+     *  the newest message, which is where a freshly-opened thread lands — and the draft survives
+     *  because [onPause] writes it. */
+    private fun restartFresh() {
+        finish()
+        overridePendingTransition(0, 0)
+        startActivity(intentFor(this, threadId, address, contactName))
+        overridePendingTransition(0, 0)
+    }
+
     private fun stopComposing() {
         if (!composing) return
         composing = false
-        composeField.clearFocus()
         composeField.isFocusable = false
         composeField.isFocusableInTouchMode = false
-        updateHint()
+        composeField.clearFocus()
+        keyFocusAnchor.requestFocus()
+        restartFresh()
     }
 
     /** Sends what's in the compose field. Empty is a no-op rather than an empty message — an SMS
