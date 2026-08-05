@@ -7,6 +7,7 @@ import life.furrer.m9.sms.SmsMessage
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -139,6 +140,35 @@ class ThreadRowsTest {
     fun `title falls back to the raw address when no contact resolved`() {
         val rows = buildThreadRows(listOf(message(id = 1, threadId = 1, address = "079123", date = 100)))
         assertEquals("079123", rows.single().title)
+    }
+
+    @Test
+    fun `a thread carries the code from its newest message`() {
+        val rows = buildThreadRows(
+            listOf(
+                message(id = 2, threadId = 1, address = "ZugerKB", body = "Code: 31080", date = 200),
+                message(id = 1, threadId = 1, address = "ZugerKB", body = "Code: 11111", date = 100),
+            ),
+        )
+
+        assertEquals("31080", rows.single().code)
+    }
+
+    @Test
+    fun `a thread with no code carries none`() {
+        val rows = buildThreadRows(listOf(message(id = 1, threadId = 1, body = "See you at eight", date = 100)))
+        assertNull(rows.single().code)
+    }
+
+    @Test
+    fun `a code you sent is not offered back to you`() {
+        val rows = buildThreadRows(
+            listOf(
+                message(id = 1, threadId = 1, body = "Code: 31080", date = 100, type = Telephony.Sms.MESSAGE_TYPE_SENT),
+            ),
+        )
+
+        assertNull(rows.single().code)
     }
 
     // The timestamp label — the bug a real message store caught: a correctly-sorted list looks

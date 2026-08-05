@@ -7,6 +7,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.util.Locale
+import life.furrer.m9.sms.OtpCodes
 import life.furrer.m9.sms.SmsMessage
 import life.furrer.m9.sms.isNumericAddress
 import life.furrer.nine.core.util.DateFmt
@@ -57,6 +58,9 @@ data class ThreadRow(
     val date: Long,
     val unreadCount: Int,
     val messageCount: Int,
+    /** The one-time code in the newest message, when it has one — so the list can offer to copy
+     *  it without opening the thread. Detected once here rather than per render. */
+    val code: String? = null,
 ) {
     /** The name if the address book knows one, else the raw address — never blank. */
     val title: String get() = displayName ?: address
@@ -113,6 +117,9 @@ fun buildThreadRows(
                 // counting it would show a permanent unread badge on a thread you just replied to.
                 unreadCount = threadMessages.count { !it.read && !isOutgoing(it) },
                 messageCount = threadMessages.size,
+                // Only inbound messages carry codes worth copying — a code you sent is not a
+                // code you need.
+                code = if (isOutgoing(newest)) null else OtpCodes.find(newest.body),
             )
         }
         .filter { row -> !unreadOnly || row.hasUnread }

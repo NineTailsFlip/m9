@@ -374,6 +374,9 @@ class ConversationListActivity : Activity() {
         val items = mutableListOf<MenuItem>()
         items += MenuItem("New message") { startActivity(ComposeActivity.intentFor(this)) }
         if (row != null) {
+            // First in the menu when there is one: on a phone whose threads are mostly
+            // verification codes, this is the single most likely reason the app was opened.
+            row.code?.let { code -> items += MenuItem("Copy code $code") { copyCode(code) } }
             items += MenuItem("Mark read") { markRead(row) }
             items += MenuItem("Mark unread") { markUnread(row) }
             items += MenuItem("Delete conversation") { confirmDeleteThread(row) }
@@ -387,6 +390,18 @@ class ConversationListActivity : Activity() {
         }
         items += MenuItem("Settings") { openSettings() }
         menuSheet.show(items)
+    }
+
+    private fun copyCode(code: String) {
+        val clipboard = getSystemService(android.content.ClipboardManager::class.java) ?: return
+        clipboard.setPrimaryClip(
+            android.content.ClipData.newPlainText("One-time code", code).apply {
+                description.extras = android.os.PersistableBundle().apply {
+                    putBoolean(android.content.ClipDescription.EXTRA_IS_SENSITIVE, true)
+                }
+            },
+        )
+        hintBar.setText("code copied")
     }
 
     private fun markUnread(row: ThreadRow) {

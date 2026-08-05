@@ -119,6 +119,12 @@
             android:name=".sms.SmsResultReceiver"
             android:exported="false" />
 
+        <!-- The notification's "Copy" action. Not exported for the same reason: only M9's own
+             notification can fire it, and the code it carries is a one-time credential. -->
+        <receiver
+            android:name=".sms.CopyCodeReceiver"
+            android:exported="false" />
+
         <service
             android:name=".sms.HeadlessSmsSendService"
             android:exported="true"

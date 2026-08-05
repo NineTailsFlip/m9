@@ -23,6 +23,11 @@ private const val ROW_SIDE_PADDING_DP = 16
 // column. Same reasoning as CallLogRowRenderer's own glyph column.
 private const val MARKER_COLUMN_WIDTH_DP = 20
 
+/** How far into a snippet a code can sit and still count as "you'd have read it anyway" — beyond
+ *  this it gets pulled to the front. Roughly the point where a narrow screen is still showing
+ *  text rather than an ellipsis. */
+private const val CODE_ALREADY_VISIBLE_CHARS = 16
+
 fun threadRowHeightDp(): Int = THREAD_ROW_HEIGHT_DP
 
 fun createThreadRowContainer(context: Context): LinearLayout = LinearLayout(context).apply {
@@ -81,11 +86,19 @@ fun bindThreadRow(container: LinearLayout, row: ThreadRow, selected: Boolean) {
             // Newlines in a message body would each eat a row's worth of height in a fixed-height
             // row, pushing the rest out of view — flattened to spaces so a multi-line SMS still
             // previews as one line of prose.
-            text = row.snippet.replace(Regex("\\s+"), " ").trim()
+            // A code message's snippet leads with the code, but only when the snippet wouldn't
+            // have shown it anyway: the code is usually the only part anyone reads, and it's
+            // often past the truncation point of the sentence announcing it ("Digitec - Galaxus
+            // Onl…"). Prefixing unconditionally reads as a stutter on the many senders whose
+            // message *starts* with the code — "31080 · Code: 31080" — so a code already visible
+            // near the front is left where it is.
+            val flattened = row.snippet.replace(Regex("\\s+"), " ").trim()
+            val alreadyVisible = row.code != null && flattened.indexOf(row.code).let { it in 0 until CODE_ALREADY_VISIBLE_CHARS }
+            text = if (row.code != null && !alreadyVisible) "${row.code} · $flattened" else flattened
             textSize = 13f
             maxLines = 1
             ellipsize = TextUtils.TruncateAt.END
-            setTextColor(Palette.GRAY_MUTED)
+            setTextColor(if (row.code != null) Palette.GRAY_DIM else Palette.GRAY_MUTED)
             // Lines up with the title, not the marker column above it.
             setPadding(dp(context, ROW_SIDE_PADDING_DP + MARKER_COLUMN_WIDTH_DP), 0, dp(context, ROW_SIDE_PADDING_DP), dp(context, 6))
         },

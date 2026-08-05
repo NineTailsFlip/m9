@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Person
 import android.content.Context
+import android.content.Intent
 import life.furrer.m9.R
 import life.furrer.m9.conversations.ConversationActivity
 import life.furrer.m9.core.Prefs
@@ -16,6 +17,10 @@ private const val CHANNEL_MMS = "unsupported_mms"
 /** The MMS notification's own fixed id — one is enough, since every one of them says the same
  *  thing and a stack of them would be noise about a limitation the user already knows about. */
 private const val NOTIFICATION_ID_MMS = 1
+
+/** Keeps the copy action's PendingIntent request code from colliding with the open-thread one
+ *  built from the same thread id. */
+private const val COPY_REQUEST_SALT = 0x0C0DE
 
 /** Incoming-message notifications. Modelled on P9's `CallNotifications`, including reusing
  *  `ic_launcher_monochrome` as the small icon — it's already exactly the white-on-transparent
@@ -62,13 +67,37 @@ object MessageNotifications {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
 
-        val notification = Notification.Builder(context, CHANNEL_INCOMING)
+        val builder = Notification.Builder(context, CHANNEL_INCOMING)
             .setSmallIcon(R.drawable.ic_launcher_monochrome)
             .setStyle(style)
             .setContentIntent(openThread)
             .setAutoCancel(true)
             .setCategory(Notification.CATEGORY_MESSAGE)
-            .build()
+
+        // "Copy" on a verification message — the whole reason this feature exists is that on a
+        // keypad phone, getting six digits out of a message and into the clipboard is otherwise
+        // several screens and a text selection. Only added when there genuinely is a code:
+        // an action that sometimes copies nothing is worse than no action.
+        OtpCodes.find(body)?.let { code ->
+            val copyIntent = Intent(context, CopyCodeReceiver::class.java).apply {
+                action = CopyCodeReceiver.ACTION_COPY_CODE
+                putExtra(CopyCodeReceiver.EXTRA_CODE, code)
+                putExtra(CopyCodeReceiver.EXTRA_THREAD_ID, threadId)
+            }
+            val copyPending = PendingIntent.getBroadcast(
+                context,
+                // Distinct from the open-thread PendingIntent's request code, or
+                // FLAG_UPDATE_CURRENT would have one overwrite the other.
+                threadId.toInt() xor COPY_REQUEST_SALT,
+                copyIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            )
+            builder.addAction(
+                Notification.Action.Builder(null as android.graphics.drawable.Icon?, "Copy $code", copyPending).build(),
+            )
+        }
+
+        val notification = builder.build()
 
         manager.notify(threadId.toInt(), notification)
     }

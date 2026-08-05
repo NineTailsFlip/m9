@@ -23,6 +23,7 @@ import java.time.LocalDate
 import life.furrer.m9.compose.ComposeActivity
 import life.furrer.m9.core.Prefs
 import life.furrer.m9.sms.MessageNotifications
+import life.furrer.m9.sms.OtpCodes
 import life.furrer.m9.sms.SmsSender
 import life.furrer.m9.sms.SmsStore
 import life.furrer.m9.sms.segmentLabel
@@ -378,6 +379,9 @@ class ConversationActivity : Activity() {
     private fun openMenu() {
         val items = mutableListOf<MenuItem>()
         selectedMessage()?.let { message ->
+            OtpCodes.find(message.body)?.let { code ->
+                items += MenuItem("Copy code $code") { copyToClipboard(code) }
+            }
             items += MenuItem("Message details") { openSelectedMessage() }
             items += MenuItem("Copy text") { copyToClipboard(message.body) }
             // Only for a message that actually failed — the one state that asks the user to do
