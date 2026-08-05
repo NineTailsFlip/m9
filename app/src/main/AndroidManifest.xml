@@ -1,12 +1,21 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- M1 is a skeleton: it reads no SMS and sends nothing yet (docs/m9-plan.md's M1), so no
-         SMS/contacts/notification permission is declared here. Each milestone's manifest should
-         reflect what the app can actually do — READ_SMS/RECEIVE_SMS/SEND_SMS/RECEIVE_MMS/
-         READ_CONTACTS/POST_NOTIFICATIONS/READ_PHONE_STATE arrive with M2/M3, and the four
-         ROLE_SMS components (SMS_DELIVER receiver, WAP_PUSH_DELIVER receiver, the smsto: activity
-         filter, HeadlessSmsSendService) arrive with M3 — an unused SMS permission prompt this
-         early would be a scary, unexplainable ask. -->
+    <!-- Exactly what M2 can actually do: read the message store, and resolve an address to a
+         contact name. Each milestone's manifest reflects the app's real abilities — an unused
+         SMS permission prompt is a scary, unexplainable ask, and M9's whole permission story is
+         one it has to be able to explain. RECEIVE_SMS/SEND_SMS/RECEIVE_MMS/POST_NOTIFICATIONS/
+         READ_PHONE_STATE and the four ROLE_SMS components (SMS_DELIVER receiver,
+         WAP_PUSH_DELIVER receiver, the smsto: activity filter, HeadlessSmsSendService) arrive
+         with M3/M4, when there is code behind them. WRITE_CONTACTS is never declared: M9 reads
+         the address book and never writes it, exactly like P9. -->
+    <uses-permission android:name="android.permission.READ_SMS" />
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
+
+    <!-- required="false", the same call P9's manifest makes and for the same reason: M9 still
+         installs (if uselessly) on a telephony-less device rather than being filtered out of the
+         store entirely. Reading an existing message store is in fact the one thing that still
+         works there. -->
+    <uses-feature android:name="android.hardware.telephony" android:required="false" />
 
     <application
         android:name=".M9Application"
