@@ -3,9 +3,11 @@ package life.furrer.m9.sms
 import android.content.ContentValues
 import android.provider.ContactsContract
 import android.provider.Telephony
+import life.furrer.m9.conversations.buildThreadRows
 import life.furrer.nine.contacts.FakeContactsProvider
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -154,6 +156,64 @@ class SmsStoreTest {
 
         assertEquals("hi", message.body)
         assertNull(message.resolvedName)
+    }
+
+    // Storing an inbound message is the single most consequential thing M9 does while it holds
+    // the SMS role: the platform hands SMS_DELIVER to the default app and stores nothing itself,
+    // so a message that doesn't land here is gone.
+
+    @Test
+    fun `insertInbound stores a message unread and unseen, in its thread`() {
+        val uri = SmsStore.insertInbound(
+            context = context,
+            threadId = 42L,
+            address = "079123",
+            body = "See you at eight",
+            sentAt = 900L,
+            receivedAt = 1000L,
+            subscriptionId = 2,
+        )
+
+        assertNotNull(uri)
+        val stored = SmsStore.queryMessages(context, 50).single()
+        assertEquals(42L, stored.threadId)
+        assertEquals("079123", stored.address)
+        assertEquals("See you at eight", stored.body)
+        assertEquals(Telephony.Sms.MESSAGE_TYPE_INBOX, stored.type)
+        assertFalse(stored.read)
+        assertFalse(stored.seen)
+        assertEquals(2, stored.subscriptionId)
+    }
+
+    @Test
+    fun `insertInbound keeps the network's sent time and this device's received time apart`() {
+        // They disagree whenever a message was delayed in the network or the phone was off, and
+        // only the received time is a reliable sort key.
+        SmsStore.insertInbound(context, 1L, "079123", "hi", sentAt = 900L, receivedAt = 5000L, subscriptionId = 1)
+
+        val stored = SmsStore.queryMessages(context, 50).single()
+        assertEquals(900L, stored.dateSent)
+        assertEquals(5000L, stored.date)
+    }
+
+    @Test
+    fun `an inbound message appears in its thread's row immediately`() {
+        SmsStore.insertInbound(context, 7L, "079123", "first", sentAt = 0L, receivedAt = 100L, subscriptionId = 1)
+        SmsStore.insertInbound(context, 7L, "079123", "second", sentAt = 0L, receivedAt = 200L, subscriptionId = 1)
+
+        val row = buildThreadRows(SmsStore.queryMessages(context, 50)).single()
+        assertEquals(7L, row.threadId)
+        assertEquals("second", row.snippet)
+        assertEquals(2, row.unreadCount)
+    }
+
+    @Test
+    fun `lookupContactName resolves one address without reading the message store`() {
+        putContactWithNumber(1L, "Timo Furrer", "+41791234567")
+
+        assertEquals("Timo Furrer", SmsStore.lookupContactName(context, "079 123 45 67"))
+        assertNull(SmsStore.lookupContactName(context, "079 999 00 11"))
+        assertNull(SmsStore.lookupContactName(context, "Migros"))
     }
 
     @Test

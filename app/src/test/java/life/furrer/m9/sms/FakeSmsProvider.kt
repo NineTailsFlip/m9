@@ -84,7 +84,15 @@ class FakeSmsProvider : ContentProvider() {
         return cursor
     }
 
-    override fun insert(uri: Uri, values: ContentValues?): Uri? = null
+    /** Assigns an id the way the real provider does and echoes back the row Uri — the receiver
+     *  treats a null return as "the message was lost", so a fake that always returned null would
+     *  make every inbound-storage test look like a failure. */
+    override fun insert(uri: Uri, values: ContentValues?): Uri? {
+        if (values == null) return null
+        val id = (messages.keys.maxOrNull() ?: 0L) + 1
+        messages[id] = ContentValues(values)
+        return Uri.withAppendedPath(uri, id.toString())
+    }
 
     /** Only the `thread_id = ?` selection [SmsStore.markThreadRead] builds is understood — a fake
      *  that pretended to parse arbitrary SQL would be a worse lie than one that doesn't try. */

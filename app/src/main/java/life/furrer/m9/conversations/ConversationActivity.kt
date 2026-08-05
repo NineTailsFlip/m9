@@ -17,6 +17,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import java.time.LocalDate
 import life.furrer.m9.core.Prefs
+import life.furrer.m9.sms.MessageNotifications
 import life.furrer.m9.sms.SmsStore
 import life.furrer.m9.sms.isNumericAddress
 import life.furrer.nine.core.Nine
@@ -165,7 +166,11 @@ class ConversationActivity : Activity() {
         )
     }
 
+    /** Opening a thread both marks it read and retires its notification — the message has
+     *  self-evidently been seen at that point, and a notification outliving that is the classic
+     *  way a messaging app trains people to ignore it. */
     private fun markRead() {
+        MessageNotifications.cancel(this, threadId)
         Async.run(background = { SmsStore.markThreadRead(this, threadId) }, onResult = {})
     }
 

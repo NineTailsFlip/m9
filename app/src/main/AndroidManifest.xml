@@ -10,6 +10,14 @@
          the address book and never writes it, exactly like P9. -->
     <uses-permission android:name="android.permission.READ_SMS" />
     <uses-permission android:name="android.permission.READ_CONTACTS" />
+    <uses-permission android:name="android.permission.RECEIVE_SMS" />
+    <uses-permission android:name="android.permission.RECEIVE_MMS" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- SEND_SMS is deliberately absent until M4, when there is code that sends. -->
+
+    <!-- Never CALL_PHONE: the call key hands off with ACTION_DIAL, so a messaging app never holds
+         the permission to place a call itself. -->
+    <!-- Never WRITE_CONTACTS: M9 reads the address book and never writes it, like P9. -->
 
     <!-- required="false", the same call P9's manifest makes and for the same reason: M9 still
          installs (if uselessly) on a telephony-less device rather than being filtered out of the
@@ -37,6 +45,21 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+
+            <!-- One of the four components ROLE_SMS requires: something that answers ACTION_SENDTO
+                 for the sms:/smsto:/mms:/mmsto: schemes. It belongs on the compose screen, which
+                 doesn't exist until M5 — until then it lands here, which at least opens M9 rather
+                 than failing to resolve. Move it to ComposeActivity when that arrives; leaving it
+                 in both places would make "message this number" ambiguous. -->
+            <intent-filter>
+                <action android:name="android.intent.action.SENDTO" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="sms" />
+                <data android:scheme="smsto" />
+                <data android:scheme="mms" />
+                <data android:scheme="mmsto" />
+            </intent-filter>
         </activity>
 
         <activity
@@ -53,6 +76,47 @@
             android:name=".settings.SettingsActivity"
             android:exported="false"
             android:theme="@style/Theme.Nine" />
+
+        <!-- The remaining three ROLE_SMS components. Each carries the sender-side permission the
+             platform requires, so only the system can deliver these broadcasts. Without all four
+             declared, M9 doesn't even appear as a candidate default SMS app. -->
+
+        <!-- Delivered to the default SMS app alone, and the platform does not store the message
+             on its behalf — see SmsDeliverReceiver. -->
+        <receiver
+            android:name=".sms.SmsDeliverReceiver"
+            android:exported="true"
+            android:permission="android.permission.BROADCAST_SMS">
+            <intent-filter>
+                <action android:name="android.provider.Telephony.SMS_DELIVER" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Inbound MMS. M9 can't display these; MmsPushReceiver preserves the raw PDU and says
+             so out loud rather than dropping it silently. -->
+        <receiver
+            android:name=".sms.MmsPushReceiver"
+            android:exported="true"
+            android:permission="android.permission.BROADCAST_WAP_PUSH">
+            <intent-filter>
+                <action android:name="android.provider.Telephony.WAP_PUSH_DELIVER" />
+                <data android:mimeType="application/vnd.wap.mms-message" />
+            </intent-filter>
+        </receiver>
+
+        <service
+            android:name=".sms.HeadlessSmsSendService"
+            android:exported="true"
+            android:permission="android.permission.SEND_RESPOND_VIA_MESSAGE">
+            <intent-filter>
+                <action android:name="android.intent.action.RESPOND_VIA_MESSAGE" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="sms" />
+                <data android:scheme="smsto" />
+                <data android:scheme="mms" />
+                <data android:scheme="mmsto" />
+            </intent-filter>
+        </service>
 
     </application>
 </manifest>

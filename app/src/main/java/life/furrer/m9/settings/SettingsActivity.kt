@@ -1,6 +1,7 @@
 package life.furrer.m9.settings
 
 import life.furrer.m9.core.Prefs
+import life.furrer.m9.sms.SmsRole
 import life.furrer.nine.core.NineSurface
 import life.furrer.nine.core.settings.NineSettingsActivity
 import life.furrer.nine.core.settings.SettingsScreen
@@ -19,6 +20,18 @@ private const val MESSAGES_TO_LOAD_STEP = 100
 class SettingsActivity : NineSettingsActivity() {
     override fun buildAppSections(screen: SettingsScreen, surface: NineSurface) {
         screen.section("Messages") {
+            // The role's permanent home, once first run has asked once and stopped asking. Shows
+            // its current state rather than assuming: the role can be taken away from M9 by
+            // granting it to another app, entirely outside M9's knowledge.
+            action(
+                label = "Default messaging app",
+                value = { if (SmsRole.isHeld(this@SettingsActivity)) "M9" else "another app" },
+                onSelect = {
+                    if (!SmsRole.isHeld(this@SettingsActivity) && SmsRole.isAvailable(this@SettingsActivity)) {
+                        startActivity(SmsRole.requestIntent(this@SettingsActivity))
+                    }
+                },
+            )
             intRange(
                 label = "Messages to load",
                 min = MIN_MESSAGES_TO_LOAD,

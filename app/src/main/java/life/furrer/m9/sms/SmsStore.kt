@@ -140,6 +140,12 @@ object SmsStore {
         }
     }
 
+    /** One address, one lookup — for callers that have a single address and no reason to read the
+     *  message store at all (a notification being built from a broadcast, say). Returns null for
+     *  an alphanumeric sender, an unknown number, or a missing READ_CONTACTS. */
+    fun lookupContactName(context: Context, address: String): String? =
+        resolveContacts(context, listOf(address))[address]?.first
+
     private fun resolveContacts(context: Context, addresses: List<String>): Map<String, Pair<String, Long>> {
         if (addresses.isEmpty()) return emptyMap()
         if (context.checkSelfPermission(Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) return emptyMap()
@@ -180,6 +186,43 @@ object SmsStore {
     // here as "the message is gone" — re-read the provider instead of assuming, the same
     // "never mirror the state, derive it" rule P9 has for Telecom.
     // ---------------------------------------------------------------------------------------
+
+    /** Stores one inbound message. This is M9's job and nobody else's once it holds the role: the
+     *  platform hands `SMS_DELIVER` to the default SMS app and does not write the provider
+     *  itself, so a message that isn't inserted here is simply gone — see [SmsDeliverReceiver],
+     *  whose whole design is about never reaching an early return without having called this.
+     *
+     *  [sentAt] is the sender's network timestamp and [receivedAt] this device's clock; both are
+     *  stored, because they disagree often enough to matter (a message delayed in the network, or
+     *  a phone that was off) and only the second one is a reliable sort key.
+     *
+     *  Returns the new row's Uri, or null if the insert was refused — which, if it ever happens
+     *  with the role held, is a lost message and worth surfacing rather than swallowing. */
+    fun insertInbound(
+        context: Context,
+        threadId: Long,
+        address: String,
+        body: String,
+        sentAt: Long,
+        receivedAt: Long,
+        subscriptionId: Int,
+    ): Uri? {
+        val values = ContentValues().apply {
+            put(Telephony.Sms.THREAD_ID, threadId)
+            put(Telephony.Sms.ADDRESS, address)
+            put(Telephony.Sms.BODY, body)
+            put(Telephony.Sms.DATE, receivedAt)
+            put(Telephony.Sms.DATE_SENT, sentAt)
+            put(Telephony.Sms.TYPE, Telephony.Sms.MESSAGE_TYPE_INBOX)
+            put(Telephony.Sms.STATUS, Telephony.Sms.STATUS_NONE)
+            // Unread and unseen: the notification is what clears SEEN, opening the thread is what
+            // clears READ (see markThreadRead).
+            put(Telephony.Sms.READ, 0)
+            put(Telephony.Sms.SEEN, 0)
+            put(Telephony.Sms.SUBSCRIPTION_ID, subscriptionId)
+        }
+        return context.contentResolver.insert(Telephony.Sms.Inbox.CONTENT_URI, values)
+    }
 
     /** READ and SEEN are different columns and both matter: SEEN is "the user knows this exists"
      *  (cleared by a notification being shown), READ is "the user has opened it". Opening a

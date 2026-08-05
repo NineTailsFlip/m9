@@ -18,6 +18,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import life.furrer.m9.core.Prefs
 import life.furrer.m9.sms.SmsMessage
+import life.furrer.m9.sms.SmsRole
 import life.furrer.m9.sms.SmsStore
 import life.furrer.nine.contacts.ContactsActivity
 import life.furrer.nine.core.Nine
@@ -154,7 +155,31 @@ class ConversationListActivity : Activity() {
             "There is no network permission — nothing here ever talks to a server."
 
     private fun requestSmsPermissions() {
-        requestPermissions(arrayOf(Manifest.permission.READ_SMS, Manifest.permission.READ_CONTACTS), REQUEST_SMS_PERMISSIONS)
+        requestPermissions(
+            arrayOf(
+                Manifest.permission.READ_SMS,
+                Manifest.permission.READ_CONTACTS,
+                Manifest.permission.RECEIVE_SMS,
+                Manifest.permission.POST_NOTIFICATIONS,
+            ),
+            REQUEST_SMS_PERMISSIONS,
+        )
+    }
+
+    /** Asked once, after permissions are in place, and never again — after that it lives as a
+     *  Settings row (same rule P9's dialer role follows). The screen has to be honest about both
+     *  halves of the trade before the system dialog appears, because the system dialog itself
+     *  says nothing about MMS: with the role, M9 stores and notifies everything that arrives; but
+     *  it also becomes the only app receiving MMS, which it cannot display. */
+    private fun maybeAskForRole() {
+        if (SmsRole.hasAskedBefore(this) || SmsRole.isHeld(this) || !SmsRole.isAvailable(this)) return
+        SmsRole.markAsked(this)
+        menuSheet.show(
+            listOf(
+                MenuItem("Set M9 as default messaging app") { startActivity(SmsRole.requestIntent(this)) },
+                MenuItem("Not now — keep reading only") { menuSheet.hide() },
+            ),
+        )
     }
 
     override fun onResume() {
@@ -163,6 +188,7 @@ class ConversationListActivity : Activity() {
             permissionScreen.hide()
             registerContentObserver()
             loadMessages()
+            maybeAskForRole()
         } else if (!permissionScreen.isShowing) {
             permissionScreen.show(permissionExplainer())
         }
@@ -350,6 +376,11 @@ class ConversationListActivity : Activity() {
             if (row.canCall) items += MenuItem("Call") { callSelected() }
         }
         items += MenuItem("Contacts") { startActivity(Intent(this, ContactsActivity::class.java)) }
+        // Only worth offering while it's missing — once held, it's a Settings row, not a
+        // recurring prompt (P9's "Set P9 as default phone app" item works the same way).
+        if (!SmsRole.isHeld(this) && SmsRole.isAvailable(this)) {
+            items += MenuItem("Set M9 as default messaging app") { startActivity(SmsRole.requestIntent(this)) }
+        }
         items += MenuItem("Settings") { openSettings() }
         menuSheet.show(items)
     }
