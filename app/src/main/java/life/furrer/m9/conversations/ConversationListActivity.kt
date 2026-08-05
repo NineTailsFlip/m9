@@ -87,9 +87,9 @@ class ConversationListActivity : Activity() {
         override fun rowCount(): Int = rows.size
         override fun createRowView(context: Context): View = createThreadRowContainer(context)
         override fun bind(view: View, index: Int, selected: Boolean) {
-            bindThreadRow(view as LinearLayout, rows[index], selected)
+            bindThreadRow(view as LinearLayout, rows[index], selected, Prefs.fontSize(this@ConversationListActivity))
         }
-        override fun rowHeight(index: Int): Int = threadRowHeightDp()
+        override fun rowHeight(index: Int): Int = threadRowHeightDp(Prefs.fontSize(this@ConversationListActivity))
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -254,7 +254,7 @@ class ConversationListActivity : Activity() {
     }
 
     private fun rebuildRows() {
-        rows = buildThreadRows(allMessages, searchField.query, unreadOnly)
+        rows = buildThreadRows(allMessages, searchField.query, unreadOnly, Prefs.draftThreadIds(this))
         rowListView.notifyDataChanged()
         val query = searchField.query
         countLabel.visibility = if (query.isNotEmpty()) View.VISIBLE else View.GONE

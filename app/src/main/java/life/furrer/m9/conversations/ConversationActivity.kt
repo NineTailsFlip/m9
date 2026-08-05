@@ -80,9 +80,10 @@ class ConversationActivity : Activity() {
         override fun rowCount(): Int = rows.size
         override fun createRowView(context: Context): View = createMessageRowContainer(context)
         override fun bind(view: View, index: Int, selected: Boolean) {
-            bindMessageRow(view as LinearLayout, rows[index], selected)
+            bindMessageRow(view as LinearLayout, rows[index], selected, Prefs.fontSize(this@ConversationActivity))
         }
-        override fun rowHeight(index: Int): Int = messageRowHeightDp(this@ConversationActivity, rows[index])
+        override fun rowHeight(index: Int): Int =
+            messageRowHeightDp(this@ConversationActivity, rows[index], Prefs.fontSize(this@ConversationActivity))
         override fun isSelectable(index: Int): Boolean = rows[index].isSelectable()
     }
 
@@ -147,6 +148,8 @@ class ConversationActivity : Activity() {
         }
         setContentView(root)
         hideStatusBar()
+        // A reply you started and walked away from is still a reply you meant to send.
+        composeField.setText(Prefs.draft(this, threadId))
         updateHint()
         loadMessages()
     }
@@ -165,6 +168,9 @@ class ConversationActivity : Activity() {
         super.onPause()
         contentObserver?.let { contentResolver.unregisterContentObserver(it) }
         contentObserver = null
+        // Saved on the way out rather than on every keystroke: this is the moment the text would
+        // otherwise be lost, and prefs writes are not free.
+        Prefs.setDraft(this, threadId, composeField.text.toString())
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
@@ -207,6 +213,7 @@ class ConversationActivity : Activity() {
      *  way a messaging app trains people to ignore it. */
     private fun markRead() {
         MessageNotifications.cancel(this, threadId)
+        MessageNotifications.cancelSendFailure(this, threadId)
         Async.run(background = { SmsStore.markThreadRead(this, threadId) }, onResult = {})
     }
 
@@ -259,6 +266,7 @@ class ConversationActivity : Activity() {
 
         SmsSender.send(this, threadId, address, body)
         composeField.setText("")
+        Prefs.setDraft(this, threadId, "")
         stopComposing()
         // The provider write is what the thread actually renders from; this just stops the list
         // waiting on a ContentObserver tick to show what was clearly just sent.
@@ -328,6 +336,11 @@ class ConversationActivity : Activity() {
         if (composing && event.action == KeyEvent.ACTION_DOWN) {
             when (event.keyCode) {
                 KeyEvent.KEYCODE_BACK -> {
+                    // Only reached when the field is empty: confirmed on-device that this
+                    // hardware's IME consumes Back as a backspace while there's text, before the
+                    // event ever reaches an app — the same capture ContactsActivity documents for
+                    // "*". The result is the suite's usual rule anyway (Back clears, Back on
+                    // empty leaves), arrived at by the device rather than by design.
                     stopComposing()
                     return true
                 }

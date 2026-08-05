@@ -125,6 +125,11 @@
             android:name=".sms.CopyCodeReceiver"
             android:exported="false" />
 
+        <!-- The failure notification's "Resend" action. -->
+        <receiver
+            android:name=".sms.ResendReceiver"
+            android:exported="false" />
+
         <service
             android:name=".sms.HeadlessSmsSendService"
             android:exported="true"

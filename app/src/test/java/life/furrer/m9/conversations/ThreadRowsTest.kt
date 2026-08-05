@@ -171,6 +171,25 @@ class ThreadRowsTest {
         assertNull(rows.single().code)
     }
 
+    @Test
+    fun `a thread with a waiting draft is marked, and others are not`() {
+        val messages = listOf(
+            message(id = 2, threadId = 2, address = "079999", date = 200),
+            message(id = 1, threadId = 1, address = "079123", date = 100),
+        )
+
+        val rows = buildThreadRows(messages, draftThreadIds = setOf(1L)).associateBy { it.threadId }
+
+        assertTrue(rows.getValue(1L).hasDraft)
+        assertFalse(rows.getValue(2L).hasDraft)
+    }
+
+    @Test
+    fun `no drafts means no thread is marked`() {
+        val rows = buildThreadRows(listOf(message(id = 1, threadId = 1, date = 100)))
+        assertFalse(rows.single().hasDraft)
+    }
+
     // The timestamp label — the bug a real message store caught: a correctly-sorted list looks
     // unsorted when every row shows only a time-of-day.
 

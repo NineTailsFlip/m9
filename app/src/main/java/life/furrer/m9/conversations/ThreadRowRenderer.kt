@@ -14,8 +14,17 @@ import life.furrer.nine.core.ui.Palette
 /** Always two lines — title and snippet — unlike P9's call log, where the second line is detail
  *  about an already-obvious row and therefore only appears on the selected one. Here the snippet
  *  *is* the row's content: a conversation list showing only names would make every thread look
- *  identical, and scanning "which of these do I need to answer" is the entire job of this screen. */
-const val THREAD_ROW_HEIGHT_DP = 56
+ *  identical, and scanning "which of these do I need to answer" is the entire job of this screen.
+ *
+ *  The height scales with the configured font size rather than being a constant: the row holds
+ *  two lines of text, so a larger setting has to buy more room or it simply clips — the same
+ *  reason T9's `taskRowHeightDp` scales with its own. The constant that used to live here was
+ *  56dp, which this formula still yields at the default size of 18. */
+fun threadRowHeightDp(fontSizeSp: Int): Int = fontSizeSp * 2 + 20
+
+/** The snippet is deliberately smaller than the title — five points, preserved across the whole
+ *  range so the hierarchy survives scaling. */
+fun snippetTextSize(fontSizeSp: Int): Float = (fontSizeSp - 5).coerceAtLeast(10).toFloat()
 private const val ROW_SIDE_PADDING_DP = 16
 
 // A fixed column for the unread dot, so every title starts at the same x whether or not its
@@ -28,13 +37,11 @@ private const val MARKER_COLUMN_WIDTH_DP = 20
  *  text rather than an ellipsis. */
 private const val CODE_ALREADY_VISIBLE_CHARS = 16
 
-fun threadRowHeightDp(): Int = THREAD_ROW_HEIGHT_DP
-
 fun createThreadRowContainer(context: Context): LinearLayout = LinearLayout(context).apply {
     orientation = LinearLayout.VERTICAL
 }
 
-fun bindThreadRow(container: LinearLayout, row: ThreadRow, selected: Boolean) {
+fun bindThreadRow(container: LinearLayout, row: ThreadRow, selected: Boolean, fontSizeSp: Int) {
     container.removeAllViews()
     val context = container.context
     val textColor = if (selected) Color.WHITE else Palette.GRAY_DIM
@@ -59,7 +66,7 @@ fun bindThreadRow(container: LinearLayout, row: ThreadRow, selected: Boolean) {
     mainLine.addView(
         TextView(context).apply {
             text = row.title
-            textSize = 18f
+            textSize = fontSizeSp.toFloat()
             maxLines = 1
             ellipsize = TextUtils.TruncateAt.END
             setTextColor(textColor)
@@ -94,11 +101,15 @@ fun bindThreadRow(container: LinearLayout, row: ThreadRow, selected: Boolean) {
             // near the front is left where it is.
             val flattened = row.snippet.replace(Regex("\\s+"), " ").trim()
             val alreadyVisible = row.code != null && flattened.indexOf(row.code).let { it in 0 until CODE_ALREADY_VISIBLE_CHARS }
-            text = if (row.code != null && !alreadyVisible) "${row.code} · $flattened" else flattened
-            textSize = 13f
+            val body = if (row.code != null && !alreadyVisible) "${row.code} · $flattened" else flattened
+            // A draft replaces the snippet rather than sitting beside it: what you were about to
+            // say matters more, here, than what was last said to you — and a draft you can't see
+            // from the list is a draft you forget you wrote.
+            text = if (row.hasDraft) "Draft · $body" else body
+            textSize = snippetTextSize(fontSizeSp)
             maxLines = 1
             ellipsize = TextUtils.TruncateAt.END
-            setTextColor(if (row.code != null) Palette.GRAY_DIM else Palette.GRAY_MUTED)
+            setTextColor(if (row.code != null || row.hasDraft) Palette.GRAY_DIM else Palette.GRAY_MUTED)
             // Lines up with the title, not the marker column above it.
             setPadding(dp(context, ROW_SIDE_PADDING_DP + MARKER_COLUMN_WIDTH_DP), 0, dp(context, ROW_SIDE_PADDING_DP), dp(context, 6))
         },

@@ -47,6 +47,11 @@ class SmsResultReceiver : BroadcastReceiver() {
         } else {
             Log.w(TAG, "Part $partIndex failed to send (${describe(resultCode)}) for $uri")
             SmsStore.updateSendState(context, uri, Telephony.Sms.MESSAGE_TYPE_FAILED)
+            // Say so. A silent failure is the one thing a messaging app must never do — see
+            // MessageNotifications.notifySendFailed.
+            SmsStore.queryMessage(context, uri)?.let { message ->
+                MessageNotifications.notifySendFailed(context, message.threadId, uri, message.address, message.body)
+            }
         }
     }
 

@@ -224,6 +224,32 @@ object SmsStore {
         return context.contentResolver.insert(Telephony.Sms.Inbox.CONTENT_URI, values)
     }
 
+    /** Reads one row back by its Uri — for a caller holding only the reference a PendingIntent
+     *  carried, which is every path that has to act on a send's outcome after the fact. */
+    fun queryMessage(context: Context, uri: Uri): SmsMessage? {
+        if (!hasReadPermission(context)) return null
+        return context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+            if (!cursor.moveToFirst()) return@use null
+            fun str(column: String) = cursor.getColumnIndex(column).let { if (it >= 0) cursor.getString(it) else null }
+            fun num(column: String) = cursor.getColumnIndex(column).let { if (it >= 0) cursor.getLong(it) else 0L }
+            SmsMessage(
+                id = num(Telephony.Sms._ID),
+                threadId = num(Telephony.Sms.THREAD_ID),
+                address = str(Telephony.Sms.ADDRESS).orEmpty(),
+                body = str(Telephony.Sms.BODY)?.trim().orEmpty(),
+                date = num(Telephony.Sms.DATE),
+                dateSent = num(Telephony.Sms.DATE_SENT),
+                type = num(Telephony.Sms.TYPE).toInt(),
+                status = num(Telephony.Sms.STATUS).toInt(),
+                read = num(Telephony.Sms.READ) != 0L,
+                seen = num(Telephony.Sms.SEEN) != 0L,
+                subscriptionId = num(Telephony.Sms.SUBSCRIPTION_ID).toInt(),
+                resolvedName = null,
+                resolvedContactId = null,
+            )
+        }
+    }
+
     /** Stores an outgoing message in the outbox *before* it is handed to the radio, so a crash or
      *  a kill mid-send leaves a visible message the user can resend rather than nothing at all.
      *  [SmsSender] moves the row on from here as results arrive.

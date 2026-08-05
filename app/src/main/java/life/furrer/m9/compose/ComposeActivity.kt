@@ -15,6 +15,7 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import life.furrer.m9.conversations.ConversationActivity
+import life.furrer.m9.core.Prefs
 import life.furrer.m9.sms.SmsSender
 import life.furrer.m9.sms.SmsStore
 import life.furrer.m9.sms.segmentLabel
@@ -82,7 +83,14 @@ class ComposeActivity : Activity() {
             body = retained.body
             selectedField = retained.selectedField
         } else {
-            prefillFromIntent()
+            val (draftTo, draftBody) = Prefs.composeDraft(this)
+            recipient = draftTo
+            body = draftBody
+            recipientName = draftTo.takeIf { it.isNotBlank() }?.let { SmsStore.lookupContactName(this, it) }
+            selectedField = if (recipient.isBlank()) Field.RECIPIENT else Field.BODY
+            // An explicit intent always wins over a leftover draft — being handed a recipient is
+            // a clearer statement of intent than something abandoned earlier.
+            if (intent.data != null || intent.hasExtra(Intent.EXTRA_TEXT)) prefillFromIntent()
         }
 
         recipientRow = fieldRow()
@@ -145,6 +153,14 @@ class ComposeActivity : Activity() {
 
     override fun onRetainNonConfigurationInstance(): Any =
         RetainedState(recipient, recipientName, body, selectedField)
+
+    override fun onPause() {
+        super.onPause()
+        // Not while an inline editor is mid-recreate: onPause fires during the Autofill-driven
+        // recreate() too, and RetainedState is already carrying the text across that. Writing
+        // here as well would be harmless but would also persist a draft the user is still typing.
+        if (!isChangingConfigurations) Prefs.setComposeDraft(this, recipient, body)
+    }
 
     override fun onDestroy() {
         super.onDestroy()
@@ -364,7 +380,12 @@ class ComposeActivity : Activity() {
         val items = mutableListOf<MenuItem>()
         items += MenuItem("Pick recipient") { openNumberPicker() }
         if (recipient.isNotEmpty() && body.isNotBlank()) items += MenuItem("Send") { send() }
-        items += MenuItem("Discard") { finish() }
+        items += MenuItem("Discard") {
+            recipient = ""
+            body = ""
+            Prefs.setComposeDraft(this, "", "")
+            finish()
+        }
         items += MenuItem("Settings") { startActivity(NineSettingsActivity.intentFor(this, Nine.app.settingsActivity)) }
         menuSheet.show(items)
     }
@@ -389,6 +410,7 @@ class ComposeActivity : Activity() {
                 threadId
             },
             onResult = { threadId ->
+                Prefs.setComposeDraft(this, "", "")
                 // Straight into the conversation, which is where the message now lives and where
                 // its delivery state will appear — a compose screen that just closed would leave
                 // the user wondering whether anything happened.

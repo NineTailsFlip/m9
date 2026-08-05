@@ -9,6 +9,10 @@ import life.furrer.nine.core.settings.SettingsScreen
 // The window the whole app's view of the store is bounded by (see Prefs.messagesToLoad). The
 // floor is high enough that a phone with a handful of active threads never notices a bound at
 // all; the ceiling is where reading and grouping in one pass stops being obviously cheap.
+// The same range T9 and L9 offer for their own font sizes — one suite, one set of expectations.
+private const val MIN_FONT_SIZE = 14
+private const val MAX_FONT_SIZE = 48
+
 private const val MIN_MESSAGES_TO_LOAD = 100
 private const val MAX_MESSAGES_TO_LOAD = 2000
 private const val MESSAGES_TO_LOAD_STEP = 100
@@ -75,6 +79,13 @@ class SettingsActivity : NineSettingsActivity() {
                 label = "Delivery reports",
                 get = { Prefs.deliveryReports(this@SettingsActivity) },
                 set = { value -> Prefs.setDeliveryReports(this@SettingsActivity, value) },
+            )
+            intRange(
+                label = "Font size",
+                min = MIN_FONT_SIZE,
+                max = MAX_FONT_SIZE,
+                get = { Prefs.fontSize(this@SettingsActivity) },
+                set = { value -> Prefs.setFontSize(this@SettingsActivity, value) },
             )
             intRange(
                 label = "Messages to load",

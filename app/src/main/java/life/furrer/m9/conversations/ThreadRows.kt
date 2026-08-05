@@ -61,6 +61,9 @@ data class ThreadRow(
     /** The one-time code in the newest message, when it has one — so the list can offer to copy
      *  it without opening the thread. Detected once here rather than per render. */
     val code: String? = null,
+    /** An unsent reply is waiting in this thread. Passed in rather than read here, so this stays
+     *  a pure function of its inputs. */
+    val hasDraft: Boolean = false,
 ) {
     /** The name if the address book knows one, else the raw address — never blank. */
     val title: String get() = displayName ?: address
@@ -96,6 +99,7 @@ fun buildThreadRows(
     messages: List<SmsMessage>,
     query: String = "",
     unreadOnly: Boolean = false,
+    draftThreadIds: Set<Long> = emptySet(),
 ): List<ThreadRow> {
     val byThread = LinkedHashMap<Long, MutableList<SmsMessage>>()
     messages.forEach { message ->
@@ -120,6 +124,7 @@ fun buildThreadRows(
                 // Only inbound messages carry codes worth copying — a code you sent is not a
                 // code you need.
                 code = if (isOutgoing(newest)) null else OtpCodes.find(newest.body),
+                hasDraft = newest.threadId in draftThreadIds,
             )
         }
         .filter { row -> !unreadOnly || row.hasUnread }

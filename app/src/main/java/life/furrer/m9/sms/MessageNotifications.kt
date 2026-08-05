@@ -13,6 +13,7 @@ import life.furrer.m9.core.Prefs
 
 private const val CHANNEL_INCOMING = "incoming_messages"
 private const val CHANNEL_MMS = "unsupported_mms"
+private const val CHANNEL_SEND_FAILED = "send_failures"
 
 /** The MMS notification's own fixed id — one is enough, since every one of them says the same
  *  thing and a stack of them would be noise about a limitation the user already knows about. */
@@ -21,6 +22,11 @@ private const val NOTIFICATION_ID_MMS = 1
 /** Keeps the copy action's PendingIntent request code from colliding with the open-thread one
  *  built from the same thread id. */
 private const val COPY_REQUEST_SALT = 0x0C0DE
+
+/** Keeps a thread's failure notification from replacing its incoming-message one — they are
+ *  about different things and can be true at the same time. */
+private const val SEND_FAILED_ID_SALT = 0x0FA11
+private const val RESEND_REQUEST_SALT = 0x0E5E4D
 
 /** Incoming-message notifications. Modelled on P9's `CallNotifications`, including reusing
  *  `ic_launcher_monochrome` as the small icon — it's already exactly the white-on-transparent
@@ -41,7 +47,60 @@ object MessageNotifications {
             // Low importance: this one reports a limitation, and it should never interrupt.
             NotificationChannel(CHANNEL_MMS, "Multimedia messages", NotificationManager.IMPORTANCE_LOW),
         )
+        manager.createNotificationChannel(
+            // High, deliberately: a message you believe you sent and haven't is the one failure
+            // in this app that can't wait to be noticed.
+            NotificationChannel(CHANNEL_SEND_FAILED, "Failed messages", NotificationManager.IMPORTANCE_HIGH),
+        )
     }
+
+    /** A send failed. Without this the failure is completely silent — the row is marked FAILED and
+     *  nothing tells anyone, so a message written in a lift or a tunnel looks sent until the
+     *  thread is next opened and a "!" is noticed. For an app whose whole job is delivering
+     *  messages, that's the failure mode worth spending a notification channel on.
+     *
+     *  Carries a Resend action, because "try again" is the only thing anyone wants to do here and
+     *  it shouldn't cost opening the app. */
+    fun notifySendFailed(context: Context, threadId: Long, uri: android.net.Uri, address: String, body: String) {
+        ensureChannels(context)
+        val manager = context.getSystemService(NotificationManager::class.java) ?: return
+
+        val contactName = SmsStore.lookupContactName(context, address)
+        val resendIntent = Intent(context, ResendReceiver::class.java).apply {
+            action = ResendReceiver.ACTION_RESEND
+            data = uri
+        }
+        val resendPending = PendingIntent.getBroadcast(
+            context,
+            threadId.toInt() xor RESEND_REQUEST_SALT,
+            resendIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        val openThread = PendingIntent.getActivity(
+            context,
+            threadId.toInt() xor SEND_FAILED_ID_SALT,
+            ConversationActivity.intentFor(context, threadId, address, contactName),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+
+        val notification = Notification.Builder(context, CHANNEL_SEND_FAILED)
+            .setSmallIcon(R.drawable.ic_launcher_monochrome)
+            .setContentTitle("Message not sent")
+            .setContentText("To ${contactName ?: address}: $body")
+            .setStyle(Notification.BigTextStyle().bigText(body))
+            .setContentIntent(openThread)
+            .setCategory(Notification.CATEGORY_ERROR)
+            .addAction(Notification.Action.Builder(null as android.graphics.drawable.Icon?, "Resend", resendPending).build())
+            .build()
+
+        manager.notify(sendFailureId(threadId), notification)
+    }
+
+    fun cancelSendFailure(context: Context, threadId: Long) {
+        context.getSystemService(NotificationManager::class.java)?.cancel(sendFailureId(threadId))
+    }
+
+    private fun sendFailureId(threadId: Long): Int = threadId.toInt() xor SEND_FAILED_ID_SALT
 
     /** One notification per thread, keyed by [threadId], so a second message from the same person
      *  updates their notification instead of stacking a new one. */

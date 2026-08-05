@@ -54,7 +54,72 @@ object Prefs {
         NinePrefs.of(context).edit().putBoolean(KEY_SHOW_MESSAGE_IN_NOTIFICATION, value).apply()
     }
 
+    /** An unsent reply, kept per thread.
+     *
+     *  Stored in prefs rather than as a `Telephony.Sms` DRAFT row: a provider draft is shared with
+     *  every other SMS app on the phone, which means M9 would be editing and deleting rows other
+     *  apps also show — a lot of cross-app state for something whose whole job is "the words you
+     *  hadn't finished". Prefs are private, survive a reboot, and cost nothing.
+     *
+     *  Keyed by thread id, so replies to different people don't overwrite each other. */
+    fun draft(context: Context, threadId: Long): String =
+        NinePrefs.of(context).getString(draftKey(threadId), "").orEmpty()
+
+    fun setDraft(context: Context, threadId: Long, text: String) {
+        NinePrefs.of(context).edit().apply {
+            // Blank clears rather than storing "": an empty draft is the absence of a draft, and
+            // leaving the key behind would make the list mark the thread forever.
+            if (text.isBlank()) remove(draftKey(threadId)) else putString(draftKey(threadId), text)
+        }.apply()
+    }
+
+    /** Which threads currently hold a draft — for the conversation list's own marker, answered in
+     *  one pass over the prefs file rather than a lookup per row. */
+    fun draftThreadIds(context: Context): Set<Long> =
+        NinePrefs.of(context).all.keys
+            .filter { it.startsWith(KEY_DRAFT_PREFIX) }
+            .mapNotNull { it.removePrefix(KEY_DRAFT_PREFIX).toLongOrNull() }
+            .toSet()
+
+    /** The compose screen's own draft — one at a time, since there is only ever one new message
+     *  being written, and it has a recipient the thread drafts don't. */
+    fun composeDraft(context: Context): Pair<String, String> =
+        NinePrefs.of(context).let { prefs ->
+            prefs.getString(KEY_COMPOSE_DRAFT_TO, "").orEmpty() to prefs.getString(KEY_COMPOSE_DRAFT_BODY, "").orEmpty()
+        }
+
+    fun setComposeDraft(context: Context, recipient: String, body: String) {
+        NinePrefs.of(context).edit().apply {
+            if (recipient.isBlank() && body.isBlank()) {
+                remove(KEY_COMPOSE_DRAFT_TO)
+                remove(KEY_COMPOSE_DRAFT_BODY)
+            } else {
+                putString(KEY_COMPOSE_DRAFT_TO, recipient)
+                putString(KEY_COMPOSE_DRAFT_BODY, body)
+            }
+        }.apply()
+    }
+
+    private fun draftKey(threadId: Long) = "$KEY_DRAFT_PREFIX$threadId"
+
+    /** Message and conversation-row text size, in sp — mirrors T9's `taskListFontSize` and L9's
+     *  own font-size prefs, same "a plain Int applied directly as textSize" shape. Row heights
+     *  scale with it (see `threadRowHeightDp`), and message rows are measured at it, so a larger
+     *  setting never clips. */
+    const val DEFAULT_FONT_SIZE = 18
+
+    fun fontSize(context: Context): Int =
+        NinePrefs.of(context).getInt(KEY_FONT_SIZE, DEFAULT_FONT_SIZE)
+
+    fun setFontSize(context: Context, value: Int) {
+        NinePrefs.of(context).edit().putInt(KEY_FONT_SIZE, value).apply()
+    }
+
     const val NO_SUBSCRIPTION_PREFERENCE = -1
+    private const val KEY_FONT_SIZE = "font_size"
+    private const val KEY_DRAFT_PREFIX = "draft_"
+    private const val KEY_COMPOSE_DRAFT_TO = "compose_draft_to"
+    private const val KEY_COMPOSE_DRAFT_BODY = "compose_draft_body"
     private const val KEY_SHOW_MESSAGE_IN_NOTIFICATION = "show_message_in_notification"
     private const val KEY_DELIVERY_REPORTS = "delivery_reports"
     private const val KEY_SENDING_SUBSCRIPTION_ID = "sending_subscription_id"
