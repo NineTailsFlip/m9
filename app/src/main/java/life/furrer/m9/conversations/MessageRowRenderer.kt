@@ -120,8 +120,13 @@ private fun bindMessage(container: LinearLayout, row: MessageRow.Entry, selected
             maxLines = MAX_LINES
             ellipsize = android.text.TextUtils.TruncateAt.END
             gravity = alignment
+            // Brightness alone marks the selection here — no underline, unlike every single-line
+            // row in the suite. A message is prose and can run to six lines; underlining all of
+            // them draws a rule under every line of a paragraph, which fights the text instead of
+            // pointing at it. White against GRAY_DIM is already an unmissable difference, and it
+            // costs the reading nothing.
             setTextColor(if (selected) Color.WHITE else Palette.GRAY_DIM)
-            paintFlags = if (selected) paintFlags or Paint.UNDERLINE_TEXT_FLAG else paintFlags and Paint.UNDERLINE_TEXT_FLAG.inv()
+            paintFlags = paintFlags and Paint.UNDERLINE_TEXT_FLAG.inv()
             setPadding(dp(context, ROW_SIDE_PADDING_DP), 0, dp(context, ROW_SIDE_PADDING_DP), 0)
         },
         LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f),

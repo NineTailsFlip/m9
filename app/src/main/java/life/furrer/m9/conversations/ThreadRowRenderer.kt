@@ -27,9 +27,13 @@ fun threadRowHeightDp(fontSizeSp: Int): Int = fontSizeSp * 2 + 20
 fun snippetTextSize(fontSizeSp: Int): Float = (fontSizeSp - 5).coerceAtLeast(10).toFloat()
 private const val ROW_SIDE_PADDING_DP = 16
 
-// A fixed column for the unread dot, so every title starts at the same x whether or not its
-// thread has unread messages — a ragged left edge is much harder to scan than a mostly-empty
-// column. Same reasoning as CallLogRowRenderer's own glyph column.
+// A fixed column for the unread dot on the *preview* line, so every preview starts at the same x
+// whether or not its thread has one — a ragged left edge is much harder to scan than a
+// mostly-empty column, the same reasoning CallLogRowRenderer's own glyph column follows.
+//
+// It used to sit beside the title instead, which meant the line you scan down paid 20dp of width
+// for a marker most rows don't carry. Moving it here costs the preview that width instead, and
+// the preview is ellipsized anyway.
 private const val MARKER_COLUMN_WIDTH_DP = 20
 
 /** How far into a snippet a code can sit and still count as "you'd have read it anyway" — beyond
@@ -41,7 +45,7 @@ fun createThreadRowContainer(context: Context): LinearLayout = LinearLayout(cont
     orientation = LinearLayout.VERTICAL
 }
 
-fun bindThreadRow(container: LinearLayout, row: ThreadRow, selected: Boolean, fontSizeSp: Int) {
+fun bindThreadRow(container: LinearLayout, row: ThreadRow, selected: Boolean, fontSizeSp: Int, unreadDotColor: Int) {
     container.removeAllViews()
     val context = container.context
     val textColor = if (selected) Color.WHITE else Palette.GRAY_DIM
@@ -51,18 +55,6 @@ fun bindThreadRow(container: LinearLayout, row: ThreadRow, selected: Boolean, fo
         gravity = Gravity.CENTER_VERTICAL
         setPadding(dp(context, ROW_SIDE_PADDING_DP), 0, dp(context, ROW_SIDE_PADDING_DP), 0)
     }
-    mainLine.addView(
-        TextView(context).apply {
-            // The one piece of state worth a glyph on this screen. Kept as a dot rather than an
-            // unread *count*: on a thread you haven't opened, "there is something here" is the
-            // actionable fact, and the count is visible the moment you open it.
-            text = if (row.hasUnread) "●" else ""
-            textSize = 12f
-            gravity = Gravity.CENTER
-            setTextColor(if (row.hasUnread) Palette.WHITE else textColor)
-        },
-        LinearLayout.LayoutParams(dp(context, MARKER_COLUMN_WIDTH_DP), ViewGroup.LayoutParams.WRAP_CONTENT),
-    )
     mainLine.addView(
         TextView(context).apply {
             text = row.title
@@ -88,7 +80,41 @@ fun bindThreadRow(container: LinearLayout, row: ThreadRow, selected: Boolean, fo
     // whose natural heights exceed it silently overflow and get clipped instead of shrinking.
     container.addView(mainLine, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
 
-    container.addView(
+    // The unread dot lives on the preview line, in the indent, rather than in a reserved column
+    // beside the title. Two reasons, and the second is the better one:
+    //
+    // It used to cost 20dp of every row's width to serve the minority of rows that have one, and
+    // the title — the thing you actually scan down — paid for it. Now the title runs the full
+    // width and the indent comes out of the preview, which is ellipsized anyway.
+    //
+    // And it sits next to what it describes: the dot means "there is something here you haven't
+    // read", and the unread thing is the message previewed on that line, not the name above it.
+    val previewLine = LinearLayout(context).apply {
+        orientation = LinearLayout.HORIZONTAL
+        setPadding(dp(context, ROW_SIDE_PADDING_DP), 0, dp(context, ROW_SIDE_PADDING_DP), dp(context, 6))
+    }
+    // Only an unread row spends the width. A read row's preview runs flush with the title above
+    // it, which is both the common case and the one with the least to say — reserving the column
+    // on every row would give the majority a permanent empty indent to pay for the minority.
+    //
+    // The ragged left edge that buys is a real cost, and it's accepted here where it wouldn't be
+    // on the title line: an unread dot that juts out past everything else is easier to pick out
+    // than one aligned in a tidy column, which is the opposite of what a scannable list of names
+    // needs.
+    if (row.hasUnread) {
+        previewLine.addView(
+            TextView(context).apply {
+                // A dot rather than an unread *count*: on a thread you haven't opened, "there is
+                // something here" is the actionable fact, and the count is visible the moment you
+                // open it.
+                text = "●"
+                textSize = 11f
+                setTextColor(unreadDotColor)
+            },
+            LinearLayout.LayoutParams(dp(context, MARKER_COLUMN_WIDTH_DP), ViewGroup.LayoutParams.WRAP_CONTENT),
+        )
+    }
+    previewLine.addView(
         TextView(context).apply {
             // Newlines in a message body would each eat a row's worth of height in a fixed-height
             // row, pushing the rest out of view — flattened to spaces so a multi-line SMS still
@@ -110,9 +136,11 @@ fun bindThreadRow(container: LinearLayout, row: ThreadRow, selected: Boolean, fo
             maxLines = 1
             ellipsize = TextUtils.TruncateAt.END
             setTextColor(if (row.code != null || row.hasDraft) Palette.GRAY_DIM else Palette.GRAY_MUTED)
-            // Lines up with the title, not the marker column above it.
-            setPadding(dp(context, ROW_SIDE_PADDING_DP + MARKER_COLUMN_WIDTH_DP), 0, dp(context, ROW_SIDE_PADDING_DP), dp(context, 6))
         },
+        LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f),
+    )
+    container.addView(
+        previewLine,
         LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT),
     )
 }

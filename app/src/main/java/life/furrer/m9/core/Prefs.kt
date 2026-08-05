@@ -102,7 +102,24 @@ object Prefs {
         NinePrefs.of(context).edit().putInt(KEY_FONT_SIZE, value).apply()
     }
 
+    /** The unread marker's colour, as ARGB.
+     *
+     *  Lavender by default: white made the dot the brightest thing on a screen where white
+     *  already means "selected", so a list with several unread threads read as several
+     *  selections. Lavender says "state" rather than "focus", and it's the accent this device's
+     *  own system UI uses. Stored as a raw colour rather than an index into a preset list, so the
+     *  picker's typed-custom option round-trips like any other choice. */
+    const val DEFAULT_UNREAD_DOT_COLOR = 0xFFB9A7E8.toInt()
+
+    fun unreadDotColor(context: Context): Int =
+        NinePrefs.of(context).getInt(KEY_UNREAD_DOT_COLOR, DEFAULT_UNREAD_DOT_COLOR)
+
+    fun setUnreadDotColor(context: Context, argb: Int) {
+        NinePrefs.of(context).edit().putInt(KEY_UNREAD_DOT_COLOR, argb).apply()
+    }
+
     const val NO_SUBSCRIPTION_PREFERENCE = -1
+    private const val KEY_UNREAD_DOT_COLOR = "unread_dot_color"
     private const val KEY_FONT_SIZE = "font_size"
     private const val KEY_DRAFT_PREFIX = "draft_"
     private const val KEY_SHOW_MESSAGE_IN_NOTIFICATION = "show_message_in_notification"

@@ -89,7 +89,13 @@ class ConversationListActivity : Activity() {
         override fun rowCount(): Int = rows.size
         override fun createRowView(context: Context): View = createThreadRowContainer(context)
         override fun bind(view: View, index: Int, selected: Boolean) {
-            bindThreadRow(view as LinearLayout, rows[index], selected, Prefs.fontSize(this@ConversationListActivity))
+            bindThreadRow(
+                view as LinearLayout,
+                rows[index],
+                selected,
+                Prefs.fontSize(this@ConversationListActivity),
+                Prefs.unreadDotColor(this@ConversationListActivity),
+            )
         }
         override fun rowHeight(index: Int): Int = threadRowHeightDp(Prefs.fontSize(this@ConversationListActivity))
     }
