@@ -77,19 +77,14 @@ class ComposeActivity : Activity() {
         super.onCreate(savedInstanceState)
         applyConfiguredTheme()
 
-        val (draftTo, draftBody) = Prefs.composeDraft(this)
-        recipient = draftTo
-        recipientName = draftTo.takeIf { it.isNotBlank() }?.let { SmsStore.lookupContactName(this, it) }
-        var initialBody = draftBody
-        // An explicit intent always wins over a leftover draft — being handed a recipient is a
-        // clearer statement of intent than something abandoned earlier.
-        if (intent.data != null || intent.hasExtra(Intent.EXTRA_TEXT)) {
-            intent.data?.schemeSpecificPart?.takeIf { it.isNotBlank() }?.let { address ->
-                recipient = address
-                recipientName = SmsStore.lookupContactName(this, address)
-            }
-            intent.getStringExtra(Intent.EXTRA_TEXT)?.let { initialBody = it }
+        // A new message starts blank, always. The only things that can pre-fill it are the intent
+        // that opened it — an addressed smsto: from another app, or a Forward carrying its text —
+        // never anything left over from last time.
+        intent.data?.schemeSpecificPart?.takeIf { it.isNotBlank() }?.let { address ->
+            recipient = address
+            recipientName = SmsStore.lookupContactName(this, address)
         }
+        val initialBody = intent.getStringExtra(Intent.EXTRA_TEXT).orEmpty()
 
         titleView = TextView(this).apply {
             textSize = 18f
@@ -146,11 +141,6 @@ class ComposeActivity : Activity() {
         // writing happens — the same landing spot an addressed smsto: intent deserves.
         focus = if (recipient.isBlank()) Focus.RECIPIENT else Focus.MESSAGE
         render()
-    }
-
-    override fun onPause() {
-        super.onPause()
-        Prefs.setComposeDraft(this, recipient, messageField.text.toString())
     }
 
     override fun onDestroy() {
@@ -358,12 +348,7 @@ class ComposeActivity : Activity() {
         val items = mutableListOf<MenuItem>()
         items += MenuItem(if (recipient.isBlank()) "Pick recipient" else "Change recipient") { openNumberPicker() }
         if (recipient.isNotBlank() && messageField.text.isNotBlank()) items += MenuItem("Send") { send() }
-        items += MenuItem("Discard") {
-            recipient = ""
-            messageField.setText("")
-            Prefs.setComposeDraft(this, "", "")
-            finish()
-        }
+        items += MenuItem("Discard") { finish() }
         items += MenuItem("Settings") { startActivity(NineSettingsActivity.intentFor(this, Nine.app.settingsActivity)) }
         menuSheet.show(items)
     }
@@ -388,7 +373,6 @@ class ComposeActivity : Activity() {
                 threadId
             },
             onResult = { threadId ->
-                Prefs.setComposeDraft(this, "", "")
                 // Into the conversation, which is where the message now lives and where its
                 // delivery state will appear — and which is what this screen was already shaped
                 // like.

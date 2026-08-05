@@ -71,7 +71,7 @@ private val m9App = NineApp(
                 KeyHelp("OK, in the message", "Send."),
                 KeyHelp("Call key", "Send."),
                 KeyHelp("*", "Open the menu: change recipient, send, discard, settings."),
-                KeyHelp("Back", "Close without sending; an unfinished message is kept as a draft."),
+                KeyHelp("Back", "Close without sending. A new message is not kept — replies are."),
             ),
         ),
     ),

@@ -81,24 +81,11 @@ object Prefs {
             .mapNotNull { it.removePrefix(KEY_DRAFT_PREFIX).toLongOrNull() }
             .toSet()
 
-    /** The compose screen's own draft — one at a time, since there is only ever one new message
-     *  being written, and it has a recipient the thread drafts don't. */
-    fun composeDraft(context: Context): Pair<String, String> =
-        NinePrefs.of(context).let { prefs ->
-            prefs.getString(KEY_COMPOSE_DRAFT_TO, "").orEmpty() to prefs.getString(KEY_COMPOSE_DRAFT_BODY, "").orEmpty()
-        }
-
-    fun setComposeDraft(context: Context, recipient: String, body: String) {
-        NinePrefs.of(context).edit().apply {
-            if (recipient.isBlank() && body.isBlank()) {
-                remove(KEY_COMPOSE_DRAFT_TO)
-                remove(KEY_COMPOSE_DRAFT_BODY)
-            } else {
-                putString(KEY_COMPOSE_DRAFT_TO, recipient)
-                putString(KEY_COMPOSE_DRAFT_BODY, body)
-            }
-        }.apply()
-    }
+    // There is deliberately no compose-screen draft. Drafts are kept per *thread*, where they
+    // belong to a conversation you can see them attached to; the new-message screen keeps
+    // nothing, because "New message" that opens pre-filled with something abandoned days ago is
+    // not a new message. An interrupted compose still survives a task switch the ordinary way —
+    // Android keeps the Activity instance — it just doesn't outlive the screen being closed.
 
     private fun draftKey(threadId: Long) = "$KEY_DRAFT_PREFIX$threadId"
 
@@ -118,8 +105,6 @@ object Prefs {
     const val NO_SUBSCRIPTION_PREFERENCE = -1
     private const val KEY_FONT_SIZE = "font_size"
     private const val KEY_DRAFT_PREFIX = "draft_"
-    private const val KEY_COMPOSE_DRAFT_TO = "compose_draft_to"
-    private const val KEY_COMPOSE_DRAFT_BODY = "compose_draft_body"
     private const val KEY_SHOW_MESSAGE_IN_NOTIFICATION = "show_message_in_notification"
     private const val KEY_DELIVERY_REPORTS = "delivery_reports"
     private const val KEY_SENDING_SUBSCRIPTION_ID = "sending_subscription_id"
