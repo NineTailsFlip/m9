@@ -102,6 +102,20 @@ object Prefs {
         NinePrefs.of(context).edit().putInt(KEY_FONT_SIZE, value).apply()
     }
 
+    /** The size of message text itself — in a thread, in the detail screen, and in the field you
+     *  write one in. Separate from [fontSize], which sizes the conversation list, because the two
+     *  are different reading tasks: the list is scanned for a name, a message is read as prose.
+     *  Wanting bigger prose without a list that fits four rows on a screen is a reasonable thing
+     *  to want, and vice versa.
+     *
+     *  Defaults to the same value, so nothing changes until it's deliberately moved. */
+    fun messageFontSize(context: Context): Int =
+        NinePrefs.of(context).getInt(KEY_MESSAGE_FONT_SIZE, DEFAULT_FONT_SIZE)
+
+    fun setMessageFontSize(context: Context, value: Int) {
+        NinePrefs.of(context).edit().putInt(KEY_MESSAGE_FONT_SIZE, value).apply()
+    }
+
     /** The unread marker's colour, as ARGB.
      *
      *  Lavender by default: white made the dot the brightest thing on a screen where white
@@ -121,6 +135,7 @@ object Prefs {
     const val NO_SUBSCRIPTION_PREFERENCE = -1
     private const val KEY_UNREAD_DOT_COLOR = "unread_dot_color"
     private const val KEY_FONT_SIZE = "font_size"
+    private const val KEY_MESSAGE_FONT_SIZE = "message_font_size"
     private const val KEY_DRAFT_PREFIX = "draft_"
     private const val KEY_SHOW_MESSAGE_IN_NOTIFICATION = "show_message_in_notification"
     private const val KEY_DELIVERY_REPORTS = "delivery_reports"

@@ -146,12 +146,22 @@ class SettingsActivity : NineSettingsActivity() {
                 value = { colorLabel(Prefs.unreadDotColor(this@SettingsActivity)) },
                 onSelect = { openUnreadColorPicker() },
             )
+            // Two sizes, because they're two reading tasks: the list is scanned for a name, a
+            // message is read as prose. Both default to the same value, so a user who never
+            // touches either sees no difference from when there was one.
             intRange(
-                label = "Font size",
+                label = "List font size",
                 min = MIN_FONT_SIZE,
                 max = MAX_FONT_SIZE,
                 get = { Prefs.fontSize(this@SettingsActivity) },
                 set = { value -> Prefs.setFontSize(this@SettingsActivity, value) },
+            )
+            intRange(
+                label = "Message font size",
+                min = MIN_FONT_SIZE,
+                max = MAX_FONT_SIZE,
+                get = { Prefs.messageFontSize(this@SettingsActivity) },
+                set = { value -> Prefs.setMessageFontSize(this@SettingsActivity, value) },
             )
             intRange(
                 label = "Messages to load",

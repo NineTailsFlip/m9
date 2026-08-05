@@ -55,7 +55,7 @@ class MessageDetailActivity : Activity() {
             // ignoring the setting here would fail it at exactly the moment it matters. The
             // title and the metadata below stay fixed: they frame the message rather than being
             // it, and scaling them would eat the room the larger body needs.
-            textSize = Prefs.fontSize(this@MessageDetailActivity).toFloat()
+            textSize = Prefs.messageFontSize(this@MessageDetailActivity).toFloat()
             setTextColor(Palette.GRAY_DIM)
             setPadding(dp(SIDE_PADDING_DP), 0, dp(SIDE_PADDING_DP), dp(12))
         }

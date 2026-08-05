@@ -102,7 +102,7 @@ class ComposeActivity : Activity() {
 
         messageField = EditText(this).apply {
             hint = "Message…"
-            textSize = Prefs.fontSize(this@ComposeActivity).toFloat()
+            textSize = Prefs.messageFontSize(this@ComposeActivity).toFloat()
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE
             setText(initialBody)
             setTextColor(Palette.WHITE)

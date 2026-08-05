@@ -93,10 +93,10 @@ class ConversationActivity : Activity() {
         override fun rowCount(): Int = rows.size
         override fun createRowView(context: Context): View = createMessageRowContainer(context)
         override fun bind(view: View, index: Int, selected: Boolean) {
-            bindMessageRow(view as LinearLayout, rows[index], selected, Prefs.fontSize(this@ConversationActivity))
+            bindMessageRow(view as LinearLayout, rows[index], selected, Prefs.messageFontSize(this@ConversationActivity))
         }
         override fun rowHeight(index: Int): Int =
-            messageRowHeightDp(this@ConversationActivity, rows[index], Prefs.fontSize(this@ConversationActivity))
+            messageRowHeightDp(this@ConversationActivity, rows[index], Prefs.messageFontSize(this@ConversationActivity))
         override fun isSelectable(index: Int): Boolean = rows[index].isSelectable()
     }
 
@@ -131,7 +131,7 @@ class ConversationActivity : Activity() {
             hint = "Reply…"
             // Same size as the messages above it and as the compose screen's own field: what you
             // are writing should look like what you are reading.
-            textSize = Prefs.fontSize(this@ConversationActivity).toFloat()
+            textSize = Prefs.messageFontSize(this@ConversationActivity).toFloat()
             // Multi-line: an SMS wraps, and a compose box that scrolled sideways on one line
             // would hide what you already typed.
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE
