@@ -6,6 +6,7 @@ import java.time.ZoneId
 import life.furrer.m9.sms.SmsMessage
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -117,6 +118,37 @@ class MessageRowsTest {
         assertEquals("✓", sendStatusGlyph(SendStatus.SENT))
         assertEquals("✓✓", sendStatusGlyph(SendStatus.DELIVERED))
         assertEquals("!", sendStatusGlyph(SendStatus.FAILED))
+    }
+
+    @Test
+    fun `day jump lands on a day's first message, not its header`() {
+        val rows = buildMessageRows(
+            listOf(
+                message(id = 3, body = "c", date = at(2026, 8, 5, 9, 0)),
+                message(id = 2, body = "b", date = at(2026, 8, 4, 18, 0)),
+                message(id = 1, body = "a", date = at(2026, 8, 4, 9, 0)),
+            ),
+            today,
+            zone,
+        )
+        // rows: [YESTERDAY, a, b, TODAY, c]
+        val fromFirstDay = rows.indexOfFirst { it is MessageRow.Entry }
+
+        val forward = dayJumpIndex(rows, fromFirstDay, 1)
+        assertTrue(rows[forward!!] is MessageRow.Entry)
+        assertEquals("c", (rows[forward] as MessageRow.Entry).body)
+
+        val back = dayJumpIndex(rows, forward, -1)
+        assertEquals("a", (rows[back!!] as MessageRow.Entry).body)
+    }
+
+    @Test
+    fun `day jump stops at the ends rather than wrapping`() {
+        val rows = buildMessageRows(listOf(message(id = 1, date = at(2026, 8, 5, 9, 0))), today, zone)
+        val only = rows.indexOfFirst { it is MessageRow.Entry }
+
+        assertNull(dayJumpIndex(rows, only, 1))
+        assertNull(dayJumpIndex(rows, only, -1))
     }
 
     private fun at(year: Int, month: Int, day: Int, hour: Int, minute: Int): Long =

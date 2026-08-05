@@ -86,6 +86,24 @@ sealed interface MessageRow {
 
 fun MessageRow.isSelectable(): Boolean = this is MessageRow.Entry
 
+/** The row to select when Left/Right jumps a day, or null when there is no further day that way.
+ *  Lands on a day's *first message*, not its header (headers aren't selectable), so the jump
+ *  reads as "go to that day" rather than "go to a label". Mirrors `:contacts`'
+ *  `letterGroupJumpIndex`, which does the same thing for letter groups — same scrub, same shape,
+ *  different unit. */
+fun dayJumpIndex(rows: List<MessageRow>, from: Int, direction: Int): Int? {
+    val headerIndices = rows.indices.filter { rows[it] is MessageRow.DayHeader }
+    if (headerIndices.isEmpty()) return null
+
+    // The day the selection currently sits in: the last header at or before it.
+    val currentHeader = headerIndices.lastOrNull { it <= from } ?: headerIndices.first()
+    val position = headerIndices.indexOf(currentHeader)
+    val target = headerIndices.getOrNull(position + direction) ?: return null
+    // The first selectable row after that header — a day always has at least one message, since
+    // headers are only written when a message opens a new day.
+    return (target + 1 until rows.size).firstOrNull { rows[it].isSelectable() }
+}
+
 /** [messages] arrives newest-first (as `SmsStore.queryMessages` returns it) and is reversed here
  *  rather than at the call site, so the "conversations read downwards" decision above lives in
  *  exactly one place. */

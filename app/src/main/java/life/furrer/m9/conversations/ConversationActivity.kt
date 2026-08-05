@@ -218,7 +218,7 @@ class ConversationActivity : Activity() {
             hintBar.setText(if (segments.isEmpty()) "ok send · ‹ back to messages" else "$segments · ok send")
             return
         }
-        hintBar.setText(if (canCall()) "* menu · ↓ reply · call ring" else "* menu · ↓ reply")
+        hintBar.setText(if (canCall()) "* menu · ↓ reply · ← → day" else "* menu · ↓ reply · ← → day")
     }
 
     /** Down past the last message enters the compose field; Back leaves it. Focus is granted only
@@ -275,6 +275,14 @@ class ConversationActivity : Activity() {
                 // Down past the last message is what opens the reply field — the plan's inline
                 // compose row, reached without a key of its own.
                 if (!rowListView.canMoveSelection(1)) startComposing() else rowListView.moveSelection(1)
+                return true
+            }
+            KeyEvent.KEYCODE_DPAD_LEFT -> {
+                jumpDay(-1)
+                return true
+            }
+            KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                jumpDay(1)
                 return true
             }
             KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
@@ -345,6 +353,14 @@ class ConversationActivity : Activity() {
             return true
         }
         return super.onKeyLongPress(keyCode, event)
+    }
+
+    /** A fast scrub through a long thread, the same one C9's contacts list does across letter
+     *  groups — reading back through a year of messages one Down press at a time is not a thing
+     *  anyone should have to do. */
+    private fun jumpDay(direction: Int) {
+        val next = dayJumpIndex(rows, rowListView.selectedIndex, direction) ?: return
+        rowListView.setSelectedIndex(next)
     }
 
     private fun selectedMessage(): MessageRow.Entry? = rows.getOrNull(rowListView.selectedIndex) as? MessageRow.Entry

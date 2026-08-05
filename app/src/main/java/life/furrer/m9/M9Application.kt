@@ -14,12 +14,9 @@ class M9Application : Application() {
     }
 }
 
-// The intro/key map below describes the app docs/m9-plan.md's "Screens" section designs for
-// 0.1.0, the same way P9Application's did before every milestone of P9 had landed — Manual
-// content is written once, against the plan, rather than rewritten screen by screen. M1 itself
-// is only the skeleton (module, manifest, placeholder ConversationListActivity, Settings): most
-// of the keys below become live in M2 (read-only conversations), M3 (the role), M4 (sending) and
-// M5 (compose) — see the milestone list in docs/m9-plan.md.
+// Every key below is live as of 0.1.0 and was checked against the running app on hardware — a
+// Manual that documents a key the app doesn't have is worse than no Manual, since it's the one
+// place a user goes when a key doesn't do what they expected.
 private val m9App = NineApp(
     id = "m9",
     name = "M9",
@@ -61,15 +58,15 @@ private val m9App = NineApp(
                 KeyHelp("— Conversation screen —", ""),
                 KeyHelp("Up / Down", "Move the selection; Down past the last message focuses the reply row."),
                 KeyHelp("Left / Right", "Jump to the previous/next day."),
-                KeyHelp("OK", "Open the selected message's details, or start typing in the reply row."),
-                KeyHelp("Call key", "Call this thread's number."),
+                KeyHelp("OK", "Open the selected message's details; in the reply row, send."),
+                KeyHelp("Call key", "Call this thread's number, or send from the reply row."),
                 KeyHelp("Back", "Leave the reply row if inside it, else close the conversation."),
-                KeyHelp("#", "Send, from the reply row."),
                 KeyHelp("*", "Open the menu: forward, copy, delete message, resend, call, contact, settings."),
                 KeyHelp("— Compose —", ""),
                 KeyHelp("OK, on \"To\"", "Pick a recipient by name or typed number."),
                 KeyHelp("OK, on the message", "Edit the message text."),
-                KeyHelp("Call key / #", "Send."),
+                KeyHelp("Call key", "Send."),
+                KeyHelp("#", "Send, when not editing a field."),
                 KeyHelp("*", "Open the menu: send, settings."),
                 KeyHelp("Back", "Close without sending."),
             ),
