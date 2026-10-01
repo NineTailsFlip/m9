@@ -31,7 +31,7 @@ private const val WEEKDAY_LABEL_DAYS = 6
 fun formatThreadTimestamp(date: Long, today: LocalDate, zone: ZoneId = ZoneId.systemDefault()): String {
     val day = Instant.ofEpochMilli(date).atZone(zone).toLocalDate()
     return when {
-        day == today -> DateFmt.formatTime(date)
+        day == today -> DateFmt.formatTime(date, zone)
         day.year != today.year -> day.format(OTHER_YEAR_FORMAT)
         day.isAfter(today.minusDays(WEEKDAY_LABEL_DAYS.toLong() + 1)) && day.isBefore(today) ->
             day.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.getDefault()).uppercase()
