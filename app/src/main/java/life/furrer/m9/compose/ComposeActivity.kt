@@ -186,8 +186,8 @@ class ComposeActivity : Activity() {
         }
         hintBar.setText(
             when (focus) {
-                Focus.RECIPIENT -> "ok pick recipient · ↓ message · * menu"
-                Focus.MESSAGE -> "ok write · ↑ recipient · * menu"
+                Focus.RECIPIENT -> "* menu · ok pick recipient · ↓ message"
+                Focus.MESSAGE -> "* menu · ok write · ↑ recipient"
             },
         )
     }

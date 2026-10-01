@@ -265,8 +265,8 @@ class ConversationActivity : Activity() {
         // existing wording (ContactsActivity and ContactDetailActivity both use it).
         hintBar.setText(
             when {
-                selectedCode() != null && canCall() -> "# copy · call dial · * menu"
-                selectedCode() != null -> "# copy code · * menu · ↓ reply"
+                selectedCode() != null && canCall() -> "* menu · # copy · call dial"
+                selectedCode() != null -> "* menu · # copy code · ↓ reply"
                 canCall() -> "* menu · ↓ reply · call dial"
                 else -> "* menu · ↓ reply · ← → day"
             },
