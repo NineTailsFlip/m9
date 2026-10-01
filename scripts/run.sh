@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Build, install, launch, and tail logs for the connected phone. M9 has a single launcher entry
-# (the conversation list), like P9/T9, so this takes no argument.
+# (the conversation list), like P9, so this takes no argument.
 set -euo pipefail
 
 cd "$(dirname "$0")/../.."

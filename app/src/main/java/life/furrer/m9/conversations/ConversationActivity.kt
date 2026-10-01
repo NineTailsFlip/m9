@@ -55,7 +55,7 @@ private const val COMPOSE_BOTTOM_PADDING_DP = 12
 /** One thread: every message with its correspondent, oldest at the top.
  *
  *  No [life.furrer.nine.core.ui.SearchField] here, which makes the key handling the simpler
- *  `onKeyDown`/`onKeyLongPress` shape T9's `TaskListActivity` uses rather than the
+ *  `onKeyDown`/`onKeyLongPress` shape L9's `MainActivity` uses rather than the
  *  `dispatchKeyEvent` interception the conversation list needs. That difference is not cosmetic:
  *  with no live IME connection on this screen, a [MenuSheet] shown over it is safe — the quirk
  *  documented on `:contacts`' `ContactValuePickerActivity` (this hardware's T9 IME composing into

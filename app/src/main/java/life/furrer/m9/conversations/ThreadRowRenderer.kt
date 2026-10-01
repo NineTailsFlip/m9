@@ -18,9 +18,8 @@ import life.furrer.nine.core.util.PhoneFormat
  *  identical, and scanning "which of these do I need to answer" is the entire job of this screen.
  *
  *  The height scales with the configured font size rather than being a constant: the row holds
- *  two lines of text, so a larger setting has to buy more room or it simply clips — the same
- *  reason T9's `taskRowHeightDp` scales with its own. The constant that used to live here was
- *  56dp, which this formula still yields at the default size of 18. */
+ *  two lines of text, so a larger setting has to buy more room or it simply clips. The constant
+ *  that used to live here was 56dp, which this formula still yields at the default size of 18. */
 fun threadRowHeightDp(fontSizeSp: Int): Int = fontSizeSp * 2 + 20
 
 /** The snippet is deliberately smaller than the title — five points, preserved across the whole

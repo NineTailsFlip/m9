@@ -9,7 +9,7 @@ import life.furrer.nine.core.settings.SettingsScreen
 // The window the whole app's view of the store is bounded by (see Prefs.messagesToLoad). The
 // floor is high enough that a phone with a handful of active threads never notices a bound at
 // all; the ceiling is where reading and grouping in one pass stops being obviously cheap.
-// The same range T9 and L9 offer for their own font sizes — one suite, one set of expectations.
+// The same range L9 offers for its own font sizes — one suite, one set of expectations.
 private const val MIN_FONT_SIZE = 14
 private const val MAX_FONT_SIZE = 48
 
@@ -49,8 +49,8 @@ private const val REQUEST_PICK_UNREAD_COLOR = 300
 
 class SettingsActivity : NineSettingsActivity() {
 
-    /** Reuses `:core`'s ColorPickerActivity — the same grid C9 picks an event colour with and T9
-     *  a task colour, so "choose a colour" is one interaction in the suite rather than three.
+    /** Reuses `:core`'s ColorPickerActivity — the same grid C9 picks an event colour with, so
+     *  "choose a colour" is one interaction in the suite rather than two.
      *  No "none" cell: an unread marker that isn't shown is just the unread state going
      *  unreported, which is a worse answer than any colour. */
     private fun openUnreadColorPicker() {

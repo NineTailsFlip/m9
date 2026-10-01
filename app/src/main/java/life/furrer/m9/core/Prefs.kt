@@ -89,10 +89,10 @@ object Prefs {
 
     private fun draftKey(threadId: Long) = "$KEY_DRAFT_PREFIX$threadId"
 
-    /** Message and conversation-row text size, in sp — mirrors T9's `taskListFontSize` and L9's
-     *  own font-size prefs, same "a plain Int applied directly as textSize" shape. Row heights
-     *  scale with it (see `threadRowHeightDp`), and message rows are measured at it, so a larger
-     *  setting never clips. */
+    /** Message and conversation-row text size, in sp — mirrors L9's own font-size prefs, same "a
+     *  plain Int applied directly as textSize" shape. Row heights scale with it (see
+     *  `threadRowHeightDp`), and message rows are measured at it, so a larger setting never
+     *  clips. */
     const val DEFAULT_FONT_SIZE = 18
 
     fun fontSize(context: Context): Int =

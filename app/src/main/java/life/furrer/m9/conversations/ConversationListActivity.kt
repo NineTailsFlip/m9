@@ -55,7 +55,7 @@ private val RESERVED_KEYS = setOf(
 
 /** M9's launcher entry: every conversation, newest first, filtered live by whatever is typed.
  *
- *  The key handling here is `ContactsActivity`'s, not `TaskListActivity`'s, because this screen
+ *  The key handling here is `ContactsActivity`'s, not `ConversationActivity`'s, because this screen
  *  has a live [SearchField] and that changes everything about dispatch — `*`'s tap-vs-hold has to
  *  be tracked by hand (the framework's own `onKeyLongPress` never fires for a key this screen
  *  intercepts in `dispatchKeyEvent`), and reserved keys have to be pulled out before the IME sees

@@ -305,7 +305,7 @@ object SmsStore {
 
     /** Deletes every message in the thread and lets the provider retire the thread row itself.
      *  `Telephony.Threads` is never written directly — it's derived bookkeeping, and a frontend
-     *  writing it is the SMS equivalent of T9 setting a sync-adapter column by hand. */
+     *  writing it is the SMS equivalent of a frontend setting a sync-adapter column by hand. */
     fun deleteThread(context: Context, threadId: Long): Boolean =
         context.contentResolver.delete(
             Telephony.Sms.CONTENT_URI,

@@ -44,7 +44,7 @@
         android:theme="@style/Theme.Nine"
         android:allowBackup="true">
 
-        <!-- M9's only launcher entry (single-surface, like P9/T9 — see M9Application.kt/
+        <!-- M9's only launcher entry (single-surface, like P9 — see M9Application.kt/
              P9Application.kt, the template this follows). -->
         <activity
             android:name=".conversations.ConversationListActivity"

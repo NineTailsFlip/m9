@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- A speech bubble: a dim gray rounded rectangle with a small tail at its bottom-left corner,
      and one bright white dot at its center — the family's one-bright-element-among-dim-ones
-     motif (see T9's checklist, P9's handset, C9's calendar/contacts icons) read here as "a
+     motif (see P9's handset, C9's calendar/contacts icons) read here as "a
      message is here". The bubble (including its tail) spans x 28-82 and y 28-78 of the 108x108
      viewport, staying inside the adaptive icon's 66dp safe zone (24-84). -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
