@@ -9,6 +9,7 @@ import android.widget.FrameLayout
 import life.furrer.m9.sms.FakeSmsProvider
 import life.furrer.nine.contacts.FakeContactsProvider
 import life.furrer.nine.core.ui.PermissionScreen
+import life.furrer.nine.core.util.Async
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -19,6 +20,8 @@ import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 /** Key handling and gating, in the shape of P9's `DialerActivityTest` — what a screen does with a
  *  keypress is the part of this app a unit test can actually hold onto. */
@@ -182,9 +185,17 @@ class ConversationListActivityTest {
         assertEquals(listOf("Timo Furrer", "079 999 00 11"), rowsOf(activity).map { it.title })
     }
 
-    /** Async.run posts its result back to the main looper; nothing is on screen until it drains. */
+    /** Async's executor is a real thread, so idling the main looper alone races it (and lost on
+     *  CI). A no-op queued behind the pending loads only runs once they've finished and posted
+     *  their results; draining the main looper then delivers them. Repeated so a result that
+     *  queues a follow-up load (the contact lookup) settles too. */
     private fun settle() {
-        shadowOf(Looper.getMainLooper()).idle()
+        repeat(SETTLE_ROUNDS) {
+            val barrier = CountDownLatch(1)
+            Async.run({ barrier.countDown() }, {})
+            assertTrue(barrier.await(5, TimeUnit.SECONDS))
+            shadowOf(Looper.getMainLooper()).idle()
+        }
     }
 
     private fun tap(activity: ConversationListActivity, keyCode: Int) {
@@ -214,3 +225,5 @@ class ConversationListActivityTest {
         return field.get(activity) as List<ThreadRow>
     }
 }
+
+private const val SETTLE_ROUNDS = 3
