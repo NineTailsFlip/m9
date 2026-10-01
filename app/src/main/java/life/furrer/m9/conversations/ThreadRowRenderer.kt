@@ -10,6 +10,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import java.time.LocalDate
 import life.furrer.nine.core.ui.Palette
+import life.furrer.nine.core.util.PhoneFormat
 
 /** Always two lines — title and snippet — unlike P9's call log, where the second line is detail
  *  about an already-obvious row and therefore only appears on the selected one. Here the snippet
@@ -57,7 +58,7 @@ fun bindThreadRow(container: LinearLayout, row: ThreadRow, selected: Boolean, fo
     }
     mainLine.addView(
         TextView(context).apply {
-            text = row.title
+            text = row.displayName ?: PhoneFormat.display(context, row.address)
             textSize = fontSizeSp.toFloat()
             maxLines = 1
             ellipsize = TextUtils.TruncateAt.END

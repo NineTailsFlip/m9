@@ -10,6 +10,7 @@ import android.content.Intent
 import life.furrer.m9.R
 import life.furrer.m9.conversations.ConversationActivity
 import life.furrer.m9.core.Prefs
+import life.furrer.nine.core.util.PhoneFormat
 
 private const val CHANNEL_INCOMING = "incoming_messages"
 private const val CHANNEL_MMS = "unsupported_mms"
@@ -86,7 +87,7 @@ object MessageNotifications {
         val notification = Notification.Builder(context, CHANNEL_SEND_FAILED)
             .setSmallIcon(R.drawable.ic_launcher_monochrome)
             .setContentTitle("Message not sent")
-            .setContentText("To ${contactName ?: address}: $body")
+            .setContentText("To ${contactName ?: PhoneFormat.display(context, address)}: $body")
             .setStyle(Notification.BigTextStyle().bigText(body))
             .setContentIntent(openThread)
             .setCategory(Notification.CATEGORY_ERROR)
@@ -109,7 +110,7 @@ object MessageNotifications {
         val manager = context.getSystemService(NotificationManager::class.java) ?: return
 
         val contactName = SmsStore.lookupContactName(context, address)
-        val sender = Person.Builder().setName(contactName ?: address).build()
+        val sender = Person.Builder().setName(contactName ?: PhoneFormat.display(context, address)).build()
         // Who it's from is never hidden — that's what makes the notification worth having at all,
         // and it's already on the lock screen of every phone. Only the text is optional.
         val shown = if (Prefs.showMessageInNotification(context)) body else "New message"

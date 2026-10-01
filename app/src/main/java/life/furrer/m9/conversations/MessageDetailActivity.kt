@@ -20,6 +20,7 @@ import life.furrer.nine.core.ui.Palette
 import life.furrer.nine.core.ui.applyConfiguredTheme
 import life.furrer.nine.core.ui.hideStatusBar
 import life.furrer.nine.core.util.Async
+import life.furrer.nine.core.util.PhoneFormat
 
 private const val SIDE_PADDING_DP = 16
 
@@ -120,7 +121,8 @@ class MessageDetailActivity : Activity() {
     private fun metaLines(message: SmsMessage): String {
         val status = sendStatusOf(message.type, message.status)
         val lines = mutableListOf<String>()
-        lines += if (status == SendStatus.RECEIVED) "Received from ${message.address}" else "Sent to ${message.address}"
+        val address = PhoneFormat.display(this, message.address)
+        lines += if (status == SendStatus.RECEIVED) "Received from $address" else "Sent to $address"
         lines += TIMESTAMP_FORMAT.format(Date(message.date))
         lines += statusWord(status)
         // Only worth a line on a phone where more than one SIM could have carried it; a

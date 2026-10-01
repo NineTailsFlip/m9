@@ -40,6 +40,7 @@ import life.furrer.nine.core.ui.applyConfiguredTheme
 import life.furrer.nine.core.ui.hideStatusBar
 import life.furrer.nine.core.util.Async
 import life.furrer.nine.core.util.Reloader
+import life.furrer.nine.core.util.PhoneFormat
 
 private const val SIDE_PADDING_DP = 16
 private const val REQUEST_CALL_PHONE_PERMISSION = 101
@@ -110,14 +111,14 @@ class ConversationActivity : Activity() {
         contactName = intent.getStringExtra(EXTRA_CONTACT_NAME)
 
         val title = TextView(this).apply {
-            text = contactName ?: address
+            text = contactName ?: PhoneFormat.display(this@ConversationActivity, address)
             textSize = 18f
             setTextColor(Palette.WHITE)
             setPadding(dp(SIDE_PADDING_DP), dp(10), dp(SIDE_PADDING_DP), 0)
         }
         // Only when a name is showing above it — otherwise this would repeat the title verbatim.
         val subtitle = TextView(this).apply {
-            text = address
+            text = PhoneFormat.display(this@ConversationActivity, address)
             textSize = 12f
             setTextColor(Palette.GRAY_MUTED)
             setPadding(dp(SIDE_PADDING_DP), 0, dp(SIDE_PADDING_DP), dp(6))

@@ -107,6 +107,7 @@ class SettingsActivity : NineSettingsActivity() {
     }
     override fun buildAppSections(screen: SettingsScreen, surface: NineSurface) {
         screen.section("Messages") {
+            numberFormatRow(this)
             // The role's permanent home, once first run has asked once and stopped asking. Shows
             // its current state rather than assuming: the role can be taken away from M9 by
             // granting it to another app, entirely outside M9's knowledge.
