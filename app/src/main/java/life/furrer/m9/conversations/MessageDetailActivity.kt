@@ -103,9 +103,7 @@ class MessageDetailActivity : Activity() {
      *  launched it was built. */
     private fun load() {
         Async.run(
-            background = {
-                SmsStore.queryMessages(this, Prefs.messagesToLoad(this)).firstOrNull { it.id == messageId }
-            },
+            background = { SmsStore.queryMessages(this, limit = 1, messageId = messageId).firstOrNull() },
             onResult = { message ->
                 if (message == null) {
                     // Deleted underneath us — nothing to show, and no reason to keep a blank

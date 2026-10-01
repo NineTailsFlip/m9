@@ -75,7 +75,13 @@ class FakeSmsProvider : ContentProvider() {
         )
         val cursor = MatrixCursor(cols)
         val limit = Regex("LIMIT (\\d+)").find(sortOrder ?: "")?.groupValues?.get(1)?.toIntOrNull() ?: Int.MAX_VALUE
+        // Only the "col = ? AND col = ?" equality shape SmsStore.queryMessages builds is understood.
+        val filters = selection?.split(" AND ")?.map { it.substringBefore(" =").trim() }.orEmpty()
+            .zip(selectionArgs.orEmpty())
         messages.entries
+            .filter { (id, values) ->
+                filters.all { (col, arg) -> (if (col == Telephony.Sms._ID) id.toString() else values.getAsString(col)) == arg }
+            }
             .sortedByDescending { it.value.getAsLong(Telephony.Sms.DATE) }
             .take(limit)
             .forEach { (id, values) ->

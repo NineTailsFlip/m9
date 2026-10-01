@@ -106,7 +106,7 @@ class SmsStoreTest {
     }
 
     @Test
-    fun `queryMessages resolves an address to its current contact name via PhoneLookup`() {
+    fun `queryMessages resolves an address to its current contact name from the address book`() {
         putContactWithNumber(1L, "Timo Furrer", "+41791234567")
         FakeSmsProvider.putMessage(1L, threadId = 1L, address = "079 123 45 67", body = "hi", date = 1L)
 
@@ -265,5 +265,23 @@ class SmsStoreTest {
                 put(ContactsContract.CommonDataKinds.Phone.NUMBER, number)
             },
         )
+    }
+
+    @Test
+    fun `queryMessages narrowed to a thread returns that thread's newest messages, not the store's`() {
+        FakeSmsProvider.putMessage(1L, threadId = 1L, address = "079123", body = "old, thread 1", date = 1L)
+        FakeSmsProvider.putMessage(2L, threadId = 2L, address = "044555", body = "newer, thread 2", date = 2L)
+        FakeSmsProvider.putMessage(3L, threadId = 2L, address = "044555", body = "newest, thread 2", date = 3L)
+
+        // With a store-wide window of 2, thread 1 would have been cut off entirely.
+        assertEquals(listOf("old, thread 1"), SmsStore.queryMessages(context, 2, threadId = 1L).map { it.body })
+    }
+
+    @Test
+    fun `queryMessages narrowed to one id returns just that message`() {
+        FakeSmsProvider.putMessage(1L, threadId = 1L, address = "079123", body = "one", date = 1L)
+        FakeSmsProvider.putMessage(2L, threadId = 1L, address = "079123", body = "two", date = 2L)
+
+        assertEquals(listOf("one"), SmsStore.queryMessages(context, 1, messageId = 1L).map { it.body })
     }
 }

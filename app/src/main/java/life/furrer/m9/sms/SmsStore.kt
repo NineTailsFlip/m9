@@ -6,11 +6,12 @@ import android.content.ContentValues
 import android.content.Context
 import android.content.pm.PackageManager
 import android.net.Uri
-import android.provider.ContactsContract
 import android.provider.Telephony
+import life.furrer.nine.contacts.ContactStore
+import life.furrer.nine.contacts.resolveNumbers
 
 /** One row of `Telephony.Sms`, before thread-grouping (see [life.furrer.m9.conversations.ThreadRows]).
- *  [resolvedName]/[resolvedContactId] come from [ContactsContract.PhoneLookup], the same live
+ *  [resolvedName]/[resolvedContactId] come from [ContactStore.resolveNumbers], the same live
  *  address-book answer P9's `CallLogStore` resolves for a call log entry — and for the same
  *  reason it doesn't trust the log's own cached label. The SMS provider's
  *  nearest equivalent, `Sms.PERSON`, is worse still: it's a raw contacts id written by whichever
@@ -46,7 +47,7 @@ data class SmsMessage(
  *  they can never be dialed, never resolve to a contact, and must never reach a code path that
  *  assumes a number — the rule docs/m9-plan.md's "Rules for implementers" spells out. Kept here
  *  rather than in `StringMatch` because this asks a weaker question than
- *  `StringMatch.looksDialable` does: "is a PhoneLookup even worth attempting", not "may this be
+ *  `StringMatch.looksDialable` does: "is a contact lookup even worth attempting", not "may this be
  *  dialed". */
 fun isNumericAddress(address: String): Boolean = address.any { it.isDigit() }
 
@@ -61,12 +62,16 @@ object SmsStore {
      *  `canonical-addresses` to get an address at all, whereas every row here already carries
      *  its own `thread_id` and `address`.
      *
-     *  Contact resolution is cached per distinct address within one call — one PhoneLookup query
-     *  per *distinct* address in the batch rather than one per row — so a long message store
-     *  against a large address book doesn't do a provider round trip per message. Exactly what
-     *  `CallLogStore.queryCallLog` does, and load-bearing for the same reason: a thread of 200
-     *  messages with one correspondent is one lookup, not 200. */
-    fun queryMessages(context: Context, limit: Int): List<SmsMessage> {
+     *  Contact resolution is one batched read of the address book's phone table for every
+     *  address at once ([ContactStore.resolveNumbers]) — not a PhoneLookup round trip per distinct
+     *  address, which cost ~15ms each and was the bulk of this load. Exactly what
+     *  `CallLogStore.queryCallLog` does.
+     *
+     *  [threadId]/[messageId] narrow the read in the provider itself, for the screens that only
+     *  ever show one thread or one message: besides not reading (and resolving) the whole store to
+     *  throw most of it away, it means a thread shows its own newest [limit] messages, not
+     *  whichever of them happen to fall inside the whole store's newest [limit]. */
+    fun queryMessages(context: Context, limit: Int, threadId: Long? = null, messageId: Long? = null): List<SmsMessage> {
         if (!hasReadPermission(context)) return emptyList()
 
         val projection = arrayOf(
@@ -83,11 +88,15 @@ object SmsStore {
             Telephony.Sms.SUBSCRIPTION_ID,
         )
         val raw = mutableListOf<SmsMessage>()
+        val filters = listOfNotNull(
+            threadId?.let { "${Telephony.Sms.THREAD_ID} = ?" to it.toString() },
+            messageId?.let { "${Telephony.Sms._ID} = ?" to it.toString() },
+        )
         context.contentResolver.query(
             Telephony.Sms.CONTENT_URI,
             projection,
-            null,
-            null,
+            filters.takeIf { it.isNotEmpty() }?.joinToString(" AND ") { it.first },
+            filters.takeIf { it.isNotEmpty() }?.map { it.second }?.toTypedArray(),
             "${Telephony.Sms.DATE} DESC LIMIT $limit",
         )?.use { cursor ->
             val idIndex = cursor.getColumnIndexOrThrow(Telephony.Sms._ID)
@@ -133,47 +142,18 @@ object SmsStore {
             }
         }
 
-        val resolved = resolveContacts(context, raw.map { it.address }.distinct())
+        val resolved = ContactStore.resolveNumbers(context, raw.map { it.address })
         return raw.map { message ->
             val match = resolved[message.address]
-            message.copy(resolvedName = match?.first, resolvedContactId = match?.second)
+            message.copy(resolvedName = match?.displayName, resolvedContactId = match?.contactId)
         }
     }
 
-    /** One address, one lookup — for callers that have a single address and no reason to read the
-     *  message store at all (a notification being built from a broadcast, say). Returns null for
-     *  an alphanumeric sender, an unknown number, or a missing READ_CONTACTS. */
+    /** One address, for callers that have a single address and no reason to read the message
+     *  store at all (a notification being built from a broadcast, say). Returns null for an
+     *  alphanumeric sender, an unknown number, or a missing READ_CONTACTS. */
     fun lookupContactName(context: Context, address: String): String? =
-        resolveContacts(context, listOf(address))[address]?.first
-
-    private fun resolveContacts(context: Context, addresses: List<String>): Map<String, Pair<String, Long>> {
-        if (addresses.isEmpty()) return emptyMap()
-        if (context.checkSelfPermission(Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) return emptyMap()
-
-        val result = mutableMapOf<String, Pair<String, Long>>()
-        addresses.forEach { address ->
-            // An alphanumeric sender can't match a phone number, so the query is skipped rather
-            // than issued and thrown away — PhoneLookup would answer "no match" for it anyway,
-            // but a shop's marketing SMS shouldn't cost a provider round trip to learn that.
-            if (address.isBlank() || !isNumericAddress(address)) return@forEach
-            val uri: Uri = Uri.withAppendedPath(ContactsContract.PhoneLookup.CONTENT_FILTER_URI, Uri.encode(address))
-            context.contentResolver.query(
-                uri,
-                arrayOf(ContactsContract.PhoneLookup._ID, ContactsContract.PhoneLookup.DISPLAY_NAME),
-                null,
-                null,
-                null,
-            )?.use { cursor ->
-                if (cursor.moveToFirst()) {
-                    val idIndex = cursor.getColumnIndexOrThrow(ContactsContract.PhoneLookup._ID)
-                    val nameIndex = cursor.getColumnIndexOrThrow(ContactsContract.PhoneLookup.DISPLAY_NAME)
-                    val name = cursor.getString(nameIndex)
-                    if (name != null) result[address] = name to cursor.getLong(idIndex)
-                }
-            }
-        }
-        return result
-    }
+        ContactStore.resolveNumbers(context, listOf(address))[address]?.displayName
 
     // ---------------------------------------------------------------------------------------
     // Writes.

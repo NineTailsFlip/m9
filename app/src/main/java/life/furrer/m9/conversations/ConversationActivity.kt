@@ -39,6 +39,7 @@ import life.furrer.nine.core.ui.RowListView
 import life.furrer.nine.core.ui.applyConfiguredTheme
 import life.furrer.nine.core.ui.hideStatusBar
 import life.furrer.nine.core.util.Async
+import life.furrer.nine.core.util.Reloader
 
 private const val SIDE_PADDING_DP = 16
 private const val REQUEST_CALL_PHONE_PERMISSION = 101
@@ -182,7 +183,6 @@ class ConversationActivity : Activity() {
         // A reply you started and walked away from is still a reply you meant to send.
         composeField.setText(Prefs.draft(this, threadId))
         updateHint()
-        loadMessages()
     }
 
     override fun onResume() {
@@ -217,27 +217,26 @@ class ConversationActivity : Activity() {
         contentResolver.registerContentObserver(Telephony.Sms.CONTENT_URI, true, observer)
     }
 
-    /** Reads the same window the list screen does and filters to this thread, rather than issuing
-     *  a thread-scoped query. One code path to the provider means one place where ordering,
-     *  contact resolution and the "messages to load" bound are decided — and a thread's messages
-     *  are by definition inside a window that was big enough to show the thread at all. */
-    private fun loadMessages() {
-        Async.run(
-            background = {
-                SmsStore.queryMessages(this, Prefs.messagesToLoad(this)).filter { it.threadId == threadId }
-            },
-            onResult = { messages ->
-                val wasAtNewest = rowListView.selectedIndex >= rows.size - 1
-                rows = buildMessageRows(messages, LocalDate.now())
-                rowListView.notifyDataChanged()
-                // A conversation is read from the bottom: land on the newest message on open, and
-                // follow it when a new one arrives — but never yank the selection away from an
-                // older message the user has deliberately scrolled back to.
-                if (wasAtNewest) rowListView.selectLastSelectable()
-                updateHint()
-            },
-        )
-    }
+    /** A thread-scoped read through the same [SmsStore.queryMessages] the list uses (so ordering
+     *  and contact resolution are still decided in one place), filtered in the provider rather
+     *  than by reading the whole store's newest window and throwing every other thread away —
+     *  which both cost a full-store read per open and cut a thread short at whatever of it
+     *  happened to fit inside that window. */
+    private val messagesLoader = Reloader(
+        background = { SmsStore.queryMessages(this, Prefs.messagesToLoad(this), threadId = threadId) },
+        onResult = { messages ->
+            val wasAtNewest = rowListView.selectedIndex >= rows.size - 1
+            rows = buildMessageRows(messages, LocalDate.now())
+            rowListView.notifyDataChanged()
+            // A conversation is read from the bottom: land on the newest message on open, and
+            // follow it when a new one arrives — but never yank the selection away from an
+            // older message the user has deliberately scrolled back to.
+            if (wasAtNewest) rowListView.selectLastSelectable()
+            updateHint()
+        },
+    )
+
+    private fun loadMessages() = messagesLoader.request()
 
     /** Opening a thread both marks it read and retires its notification — the message has
      *  self-evidently been seen at that point, and a notification outliving that is the classic

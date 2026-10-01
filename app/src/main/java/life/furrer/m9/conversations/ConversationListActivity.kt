@@ -35,6 +35,7 @@ import life.furrer.nine.core.ui.SearchField
 import life.furrer.nine.core.ui.applyConfiguredTheme
 import life.furrer.nine.core.ui.hideStatusBar
 import life.furrer.nine.core.util.Async
+import life.furrer.nine.core.util.Reloader
 
 private const val REQUEST_SMS_PERMISSIONS = 100
 private const val REQUEST_CALL_PHONE_PERMISSION = 101
@@ -149,7 +150,9 @@ class ConversationListActivity : Activity() {
         hideStatusBar()
         updateHint()
 
-        if (hasNeededPermissions()) loadMessages() else permissionScreen.show(permissionExplainer())
+        // No load here: onResume always follows and loads, and doing both was measured as two
+        // full reads back to back on every launch.
+        if (!hasNeededPermissions()) permissionScreen.show(permissionExplainer())
     }
 
     private fun hasNeededPermissions(): Boolean = SmsStore.hasReadPermission(this)
@@ -255,15 +258,15 @@ class ConversationListActivity : Activity() {
         contentResolver.registerContentObserver(Telephony.Sms.CONTENT_URI, true, observer)
     }
 
-    private fun loadMessages() {
-        Async.run(
-            background = { SmsStore.queryMessages(this, Prefs.messagesToLoad(this)) },
-            onResult = { result ->
-                allMessages = result
-                rebuildRows()
-            },
-        )
-    }
+    private val messagesLoader = Reloader(
+        background = { SmsStore.queryMessages(this, Prefs.messagesToLoad(this)) },
+        onResult = { result ->
+            allMessages = result
+            rebuildRows()
+        },
+    )
+
+    private fun loadMessages() = messagesLoader.request()
 
     private fun rebuildRows() {
         rows = buildThreadRows(allMessages, searchField.query, unreadOnly, Prefs.draftThreadIds(this))
