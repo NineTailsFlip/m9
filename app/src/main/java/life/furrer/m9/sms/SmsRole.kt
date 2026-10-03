@@ -27,9 +27,11 @@ object SmsRole {
     fun isAvailable(context: Context): Boolean =
         roleManager(context)?.isRoleAvailable(RoleManager.ROLE_SMS) ?: false
 
-    /** Start with `startActivityForResult`; the result code itself isn't meaningful to check —
-     *  the only reliable way to know it took is to re-check [isHeld] once control returns. Same
-     *  caveat `DialerRole.requestIntent` carries. */
+    /** Start with `startActivityForResult`, never plain `startActivity`: the system's role
+     *  request screen finishes immediately, showing nothing, when it has no calling activity to
+     *  answer, which is what made "Set M9 as default messaging app" silently do nothing. The
+     *  result code itself isn't meaningful to check — the only reliable way to know it took is to
+     *  re-check [isHeld] once control returns. Same caveat `DialerRole.requestIntent` carries. */
     fun requestIntent(context: Context): Intent =
         roleManager(context)!!.createRequestRoleIntent(RoleManager.ROLE_SMS)
 

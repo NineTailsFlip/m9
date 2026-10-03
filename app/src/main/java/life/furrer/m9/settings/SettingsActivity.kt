@@ -46,6 +46,7 @@ private val UNREAD_COLOR_LABELS = arrayOf(
 )
 
 private const val REQUEST_PICK_UNREAD_COLOR = 300
+private const val REQUEST_SMS_ROLE = 301
 
 class SettingsActivity : NineSettingsActivity() {
 
@@ -71,6 +72,11 @@ class SettingsActivity : NineSettingsActivity() {
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: android.content.Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == REQUEST_SMS_ROLE) {
+            // The result code says nothing reliable; the row re-reads SmsRole.isHeld itself.
+            refresh()
+            return
+        }
         if (requestCode != REQUEST_PICK_UNREAD_COLOR || resultCode != RESULT_OK || data == null) return
         // EXTRA_RESULT_ARGB carries the colour for both a preset and a typed custom one, so the
         // stored value never has to know which the user picked.
@@ -116,7 +122,8 @@ class SettingsActivity : NineSettingsActivity() {
                 value = { if (SmsRole.isHeld(this@SettingsActivity)) "M9" else "another app" },
                 onSelect = {
                     if (!SmsRole.isHeld(this@SettingsActivity) && SmsRole.isAvailable(this@SettingsActivity)) {
-                        startActivity(SmsRole.requestIntent(this@SettingsActivity))
+                        @Suppress("DEPRECATION")
+                        startActivityForResult(SmsRole.requestIntent(this@SettingsActivity), REQUEST_SMS_ROLE)
                     }
                 },
             )

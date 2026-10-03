@@ -39,6 +39,7 @@ import life.furrer.nine.core.util.Reloader
 
 private const val REQUEST_SMS_PERMISSIONS = 100
 private const val REQUEST_CALL_PHONE_PERMISSION = 101
+private const val REQUEST_SMS_ROLE = 102
 private const val SIDE_PADDING_DP = 16
 
 /** Reserved exactly as `ContactsActivity` reserves them, and for the reason its own comment
@@ -189,10 +190,16 @@ class ConversationListActivity : Activity() {
         SmsRole.markAsked(this)
         menuSheet.show(
             listOf(
-                MenuItem("Set M9 as default messaging app") { startActivity(SmsRole.requestIntent(this)) },
+                MenuItem("Set M9 as default messaging app") { requestSmsRole() },
                 MenuItem("Not now — keep reading only") { menuSheet.hide() },
             ),
         )
+    }
+
+    /** onResume, which always follows the result, re-checks the role and reloads. */
+    private fun requestSmsRole() {
+        @Suppress("DEPRECATION")
+        startActivityForResult(SmsRole.requestIntent(this), REQUEST_SMS_ROLE)
     }
 
     override fun onResume() {
@@ -427,7 +434,7 @@ class ConversationListActivity : Activity() {
         // Only worth offering while it's missing — once held, it's a Settings row, not a
         // recurring prompt (P9's "Set P9 as default phone app" item works the same way).
         if (!SmsRole.isHeld(this) && SmsRole.isAvailable(this)) {
-            items += MenuItem("Set M9 as default messaging app") { startActivity(SmsRole.requestIntent(this)) }
+            items += MenuItem("Set M9 as default messaging app") { requestSmsRole() }
         }
         items += MenuItem("Settings") { openSettings() }
         menuSheet.show(items)
