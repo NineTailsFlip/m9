@@ -1,0 +1,3 @@
+- Mark as read from the notification
+- Share text from other apps to M9
+- Open or add the contact from a conversation
