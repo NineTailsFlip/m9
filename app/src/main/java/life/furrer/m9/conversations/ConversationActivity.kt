@@ -28,6 +28,10 @@ import life.furrer.m9.sms.SmsSender
 import life.furrer.m9.sms.SmsStore
 import life.furrer.m9.sms.segmentLabel
 import life.furrer.m9.sms.isNumericAddress
+import life.furrer.nine.contacts.ContactDetailActivity
+import life.furrer.nine.contacts.ContactHandoff
+import life.furrer.nine.contacts.ContactStore
+import life.furrer.nine.contacts.resolveNumbers
 import life.furrer.nine.core.Nine
 import life.furrer.nine.core.settings.NineSettingsActivity
 import life.furrer.nine.core.ui.HintBar
@@ -71,6 +75,8 @@ class ConversationActivity : Activity() {
     private var threadId: Long = -1L
     private var address: String = ""
     private var contactName: String? = null
+    /** The thread's address resolved to a contact, refreshed with every load; null when unknown. */
+    private var contactId: Long? = null
     private var rows: List<MessageRow> = emptyList()
 
     private var pendingCallNumber: String? = null
@@ -224,8 +230,15 @@ class ConversationActivity : Activity() {
      *  which both cost a full-store read per open and cut a thread short at whatever of it
      *  happened to fit inside that window. */
     private val messagesLoader = Reloader(
-        background = { SmsStore.queryMessages(this, Prefs.messagesToLoad(this), threadId = threadId) },
-        onResult = { messages ->
+        background = {
+            val messages = SmsStore.queryMessages(this, Prefs.messagesToLoad(this), threadId = threadId)
+            val id = if (isNumericAddress(address)) {
+                ContactStore.resolveNumbers(this, listOf(address))[address]?.contactId
+            } else null
+            messages to id
+        },
+        onResult = { (messages, id) ->
+            contactId = id
             val wasAtNewest = rowListView.selectedIndex >= rows.size - 1
             rows = buildMessageRows(messages, LocalDate.now())
             rowListView.notifyDataChanged()
@@ -524,6 +537,7 @@ class ConversationActivity : Activity() {
             items += MenuItem("Delete message") { confirmDeleteMessage(message) }
         }
         if (canCall()) items += MenuItem("Call") { call() }
+        contactMenuItems().let { items += it }
         items += MenuItem("Delete conversation") { confirmDeleteThread() }
         items += MenuItem("Settings") { openSettings() }
         menuSheet.show(items)
@@ -531,6 +545,21 @@ class ConversationActivity : Activity() {
 
     /** Reuses the failed message's own row rather than writing a new one, so resending doesn't
      *  leave two copies of the same message in the thread. */
+    /** "Open contact" when the address is a known contact; otherwise, for a numeric address only,
+     *  the New/Add hand-offs (M9 holds no WRITE_CONTACTS). An alphanumeric sender (`Migros`) is
+     *  not a number anyone can save, so it gets neither. */
+    private fun contactMenuItems(): List<MenuItem> {
+        if (!isNumericAddress(address)) return emptyList()
+        val id = contactId
+        return if (id != null) {
+            listOf(MenuItem("Open contact") {
+                startActivity(Intent(this, ContactDetailActivity::class.java).putExtra(ContactDetailActivity.EXTRA_CONTACT_ID, id))
+            })
+        } else {
+            ContactHandoff.menuItems(this, menuSheet, address)
+        }
+    }
+
     private fun resend(message: MessageRow.Entry) {
         val uri = ContentUris.withAppendedId(Telephony.Sms.CONTENT_URI, message.id)
         Async.run(
