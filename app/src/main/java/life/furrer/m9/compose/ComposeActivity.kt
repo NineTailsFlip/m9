@@ -89,7 +89,7 @@ class ComposeActivity : Activity() {
         recipients = addressing.recipients
         recipientNames = recipients.map { SmsStore.lookupContactName(this, it) }
         val initialBody = addressing.body
-            ?: intent.getStringExtra(Intent.EXTRA_TEXT)
+            ?: intent.getCharSequenceExtra(Intent.EXTRA_TEXT)?.toString()
             ?: intent.getStringExtra("sms_body")
             ?: ""
 
@@ -148,6 +148,13 @@ class ComposeActivity : Activity() {
         // writing happens — the same landing spot an addressed smsto: intent deserves.
         focus = if (recipients.isEmpty()) Focus.RECIPIENT else Focus.MESSAGE
         render()
+
+        // "Share via M9" brings text and no addressee, so the one thing left to ask is who it
+        // goes to: open the picker straight away. Only on a fresh start — a recreate keeps the
+        // recipient already chosen. Backing out of the picker leaves the screen as Forward does.
+        if (savedInstanceState == null && intent.action == Intent.ACTION_SEND && recipients.isEmpty()) {
+            openNumberPicker()
+        }
     }
 
     override fun onDestroy() {
