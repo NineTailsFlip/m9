@@ -31,16 +31,18 @@ class HeadlessSmsSendService : Service() {
     }
 
     private fun respond(intent: Intent) {
-        // "smsto:+41791234567" -> "+41791234567". schemeSpecificPart rather than a manual prefix
-        // strip, so every one of the four schemes the filter accepts works the same way.
-        val address = intent.data?.schemeSpecificPart?.takeIf { it.isNotBlank() }
-        val body = intent.getStringExtra(Intent.EXTRA_TEXT)?.takeIf { it.isNotBlank() }
-        if (address == null || body == null) {
+        // "smsto:+41791234567" -> "+41791234567", the same for all four schemes the filter
+        // accepts; SmsUri keeps a ?body= out of the number and splits several recipients.
+        val addressing = SmsUri.parse(intent.data?.encodedSchemeSpecificPart)
+        val body = intent.getStringExtra(Intent.EXTRA_TEXT)?.takeIf { it.isNotBlank() } ?: addressing.body
+        if (addressing.recipients.isEmpty() || body == null) {
             Log.w(TAG, "Respond-via-message without a destination or a body — nothing sent")
             return
         }
-        val threadId = Telephony.Threads.getOrCreateThreadId(this, address)
-        SmsSender.send(this, threadId, address, body)
+        addressing.recipients.forEach { address ->
+            val threadId = Telephony.Threads.getOrCreateThreadId(this, address)
+            SmsSender.send(this, threadId, address, body)
+        }
     }
 
     override fun onBind(intent: Intent?): IBinder? = null

@@ -19,6 +19,7 @@ import life.furrer.m9.conversations.ConversationActivity
 import life.furrer.m9.core.Prefs
 import life.furrer.m9.sms.SmsSender
 import life.furrer.m9.sms.SmsStore
+import life.furrer.m9.sms.SmsUri
 import life.furrer.m9.sms.segmentLabel
 import life.furrer.nine.contacts.ContactValuePickerActivity
 import life.furrer.nine.contacts.DataKind
@@ -54,8 +55,11 @@ private const val REQUEST_PICK_NUMBER = 200
  *  arises. `ConversationActivity`'s reply row is built the same way for the same reason. */
 class ComposeActivity : Activity() {
 
-    private var recipient: String = ""
-    private var recipientName: String? = null
+    /** Usually one number. Several only arrive from an `smsto:a,b` link; M9 has no MMS, so they
+     *  get the message one by one, each in their own thread — the same as Android's own
+     *  messaging app does for a group without MMS. Picking a recipient here always replaces them. */
+    private var recipients: List<String> = emptyList()
+    private var recipientNames: List<String?> = emptyList()
 
     /** Which of the screen's two parts the keys act on. Mirrors the conversation screen, where
      *  the same Down that walks off the last message lands in the reply row. */
@@ -79,12 +83,15 @@ class ComposeActivity : Activity() {
 
         // A new message starts blank, always. The only things that can pre-fill it are the intent
         // that opened it — an addressed smsto: from another app, or a Forward carrying its text —
-        // never anything left over from last time.
-        intent.data?.schemeSpecificPart?.takeIf { it.isNotBlank() }?.let { address ->
-            recipient = address
-            recipientName = SmsStore.lookupContactName(this, address)
-        }
-        val initialBody = intent.getStringExtra(Intent.EXTRA_TEXT).orEmpty()
+        // never anything left over from last time. A link's own ?body= wins over the extras;
+        // sms_body is the extra older apps put the text in instead of EXTRA_TEXT.
+        val addressing = SmsUri.parse(intent.data?.encodedSchemeSpecificPart)
+        recipients = addressing.recipients
+        recipientNames = recipients.map { SmsStore.lookupContactName(this, it) }
+        val initialBody = addressing.body
+            ?: intent.getStringExtra(Intent.EXTRA_TEXT)
+            ?: intent.getStringExtra("sms_body")
+            ?: ""
 
         titleView = TextView(this).apply {
             textSize = 18f
@@ -139,7 +146,7 @@ class ComposeActivity : Activity() {
 
         // With a recipient already known there is nothing left to choose, so start where the
         // writing happens — the same landing spot an addressed smsto: intent deserves.
-        focus = if (recipient.isBlank()) Focus.RECIPIENT else Focus.MESSAGE
+        focus = if (recipients.isEmpty()) Focus.RECIPIENT else Focus.MESSAGE
         render()
     }
 
@@ -155,10 +162,10 @@ class ComposeActivity : Activity() {
 
     private fun render() {
         val selected = focus == Focus.RECIPIENT && !composing
-        titleView.text = when {
-            recipientName != null -> recipientName
-            recipient.isNotBlank() -> recipient
-            else -> "New message"
+        titleView.text = if (recipients.isEmpty()) {
+            "New message"
+        } else {
+            recipients.indices.joinToString(", ") { recipientNames[it] ?: recipients[it] }
         }
         titleView.setTextColor(if (selected) Palette.WHITE else Palette.GRAY_DIM)
         titleView.paintFlags = if (selected) {
@@ -169,8 +176,9 @@ class ComposeActivity : Activity() {
 
         // The number only earns its own line when it isn't already the title.
         subtitleView.text = when {
-            recipient.isBlank() -> "No recipient yet"
-            recipientName != null -> recipient
+            recipients.isEmpty() -> "No recipient yet"
+            recipients.size > 1 -> "${recipients.size} recipients · sent to each separately"
+            recipientNames[0] != null -> recipients[0]
             else -> ""
         }
         subtitleView.visibility = if (subtitleView.text.isNullOrEmpty()) View.GONE else View.VISIBLE
@@ -338,16 +346,16 @@ class ComposeActivity : Activity() {
     }
 
     private fun applyRecipient(number: String, name: String?) {
-        recipient = number
-        recipientName = name
+        recipients = listOf(number)
+        recipientNames = listOf(name)
         // Straight on to what you actually came here to write.
         startComposing()
     }
 
     private fun openMenu() {
         val items = mutableListOf<MenuItem>()
-        items += MenuItem(if (recipient.isBlank()) "Pick recipient" else "Change recipient") { openNumberPicker() }
-        if (recipient.isNotBlank() && messageField.text.isNotBlank()) items += MenuItem("Send") { send() }
+        items += MenuItem(if (recipients.isEmpty()) "Pick recipient" else "Change recipient") { openNumberPicker() }
+        if (recipients.isNotEmpty() && messageField.text.isNotBlank()) items += MenuItem("Send") { send() }
         items += MenuItem("Discard") { finish() }
         items += MenuItem("Settings") { startActivity(NineSettingsActivity.intentFor(this, Nine.app.settingsActivity)) }
         menuSheet.show(items)
@@ -357,7 +365,7 @@ class ComposeActivity : Activity() {
      *  nothing is indistinguishable from a broken key. */
     private fun send() {
         val text = messageField.text.toString().trim()
-        if (recipient.isBlank()) {
+        if (recipients.isEmpty()) {
             hintBar.setText("no recipient yet — ↑ then ok to pick one")
             return
         }
@@ -365,18 +373,23 @@ class ComposeActivity : Activity() {
             hintBar.setText("nothing to send — write something first")
             return
         }
-        val address = recipient
+        val addresses = recipients
         Async.run(
             background = {
-                val threadId = Telephony.Threads.getOrCreateThreadId(this, address)
-                SmsSender.send(this, threadId, address, text)
-                threadId
+                addresses.map { address ->
+                    val threadId = Telephony.Threads.getOrCreateThreadId(this, address)
+                    SmsSender.send(this, threadId, address, text)
+                    threadId
+                }
             },
-            onResult = { threadId ->
+            onResult = { threadIds ->
                 // Into the conversation, which is where the message now lives and where its
                 // delivery state will appear — and which is what this screen was already shaped
-                // like.
-                startActivity(ConversationActivity.intentFor(this, threadId, address, recipientName))
+                // like. Sent to several, there's no one conversation to land in, so back to the
+                // list, where each of the threads now sits on top.
+                if (threadIds.size == 1) {
+                    startActivity(ConversationActivity.intentFor(this, threadIds[0], addresses[0], recipientNames[0]))
+                }
                 finish()
             },
         )
