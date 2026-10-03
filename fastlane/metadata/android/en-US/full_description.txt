@@ -1,0 +1,18 @@
+Messages on 9 keys. SMS for phones with a physical keypad and no touchscreen: conversations
+newest-first, a thread you read top to bottom, and a reply row one key away.
+
+Features:
+
+* T9 filter over the conversation list by name, number or message text
+* Reply from inside the thread, with a live SMS segment count
+* Pick recipients from your contacts with T9 search
+* Optional delivery reports
+* Notifications for new messages
+* Sends and receives as your default messaging app; read-only without that role
+* No MMS yet: an incoming multimedia message is reported, not dropped silently
+* An in-app manual covering every key
+
+No internet permission, no ads, no analytics, no third-party libraries. Messages go only through
+the phone's own SMS radio.
+
+Part of Nine, a suite of apps for keypad phones: https://nine.furrer.life

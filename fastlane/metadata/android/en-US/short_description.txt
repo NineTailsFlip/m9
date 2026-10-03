@@ -1,0 +1,1 @@
+SMS messaging for D-pad and T9 keypad phones
