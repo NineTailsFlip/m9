@@ -289,6 +289,18 @@ object SmsStore {
         ) > 0
     }
 
+    /** Only SEEN: the user dismissed the thread's notification, so they know the message exists,
+     *  but nothing says they've read it — it stays unread in the list. */
+    fun markThreadSeen(context: Context, threadId: Long): Boolean {
+        val values = ContentValues().apply { put(Telephony.Sms.SEEN, 1) }
+        return context.contentResolver.update(
+            Telephony.Sms.CONTENT_URI,
+            values,
+            "${Telephony.Sms.THREAD_ID} = ?",
+            arrayOf(threadId.toString()),
+        ) > 0
+    }
+
     /** The inverse: marks a thread unread again, for someone who opened it by accident and wants
      *  it back in their "still to deal with" list. Only READ is cleared, not SEEN — the user has
      *  demonstrably seen that it exists, and clearing SEEN would resurrect a notification for a

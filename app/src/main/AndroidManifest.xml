@@ -131,6 +131,11 @@
             android:name=".sms.CopyCodeReceiver"
             android:exported="false" />
 
+        <!-- The incoming notification's "Mark as read" action and its dismissal. -->
+        <receiver
+            android:name=".sms.ThreadNotificationReceiver"
+            android:exported="false" />
+
         <!-- The failure notification's "Resend" action. -->
         <receiver
             android:name=".sms.ResendReceiver"

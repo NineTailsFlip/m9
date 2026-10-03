@@ -23,6 +23,8 @@ private const val NOTIFICATION_ID_MMS = 1
 /** Keeps the copy action's PendingIntent request code from colliding with the open-thread one
  *  built from the same thread id. */
 private const val COPY_REQUEST_SALT = 0x0C0DE
+private const val MARK_READ_REQUEST_SALT = 0x0DEAD
+private const val DISMISS_REQUEST_SALT = 0x0D15
 
 /** Keeps a thread's failure notification from replacing its incoming-message one — they are
  *  about different things and can be true at the same time. */
@@ -133,6 +135,7 @@ object MessageNotifications {
             .setContentIntent(openThread)
             .setAutoCancel(true)
             .setCategory(Notification.CATEGORY_MESSAGE)
+            .setDeleteIntent(threadAction(context, threadId, ThreadNotificationReceiver.ACTION_DISMISSED, DISMISS_REQUEST_SALT))
 
         // "Copy" on a verification message — the whole reason this feature exists is that on a
         // keypad phone, getting six digits out of a message and into the clipboard is otherwise
@@ -157,9 +160,34 @@ object MessageNotifications {
             )
         }
 
+        builder.addAction(
+            Notification.Action.Builder(
+                null as android.graphics.drawable.Icon?,
+                "Mark as read",
+                threadAction(context, threadId, ThreadNotificationReceiver.ACTION_MARK_READ, MARK_READ_REQUEST_SALT),
+            )
+                .setSemanticAction(Notification.Action.SEMANTIC_ACTION_MARK_AS_READ)
+                .build(),
+        )
+
         val notification = builder.build()
 
         manager.notify(threadId.toInt(), notification)
+    }
+
+    /** A [ThreadNotificationReceiver] broadcast for [threadId], salted so it doesn't overwrite the
+     *  thread's other PendingIntents under FLAG_UPDATE_CURRENT. */
+    private fun threadAction(context: Context, threadId: Long, action: String, salt: Int): PendingIntent {
+        val intent = Intent(context, ThreadNotificationReceiver::class.java).apply {
+            this.action = action
+            putExtra(ThreadNotificationReceiver.EXTRA_THREAD_ID, threadId)
+        }
+        return PendingIntent.getBroadcast(
+            context,
+            threadId.toInt() xor salt,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
     }
 
     /** Cancels a thread's notification — called when that conversation is opened, since the
