@@ -1,0 +1,3 @@
+- * opens the menu again after leaving the message field on New message
+- Holding * opens Settings without also opening the menu
+- Holding OK or a number to choose a menu entry no longer types into the search behind it
