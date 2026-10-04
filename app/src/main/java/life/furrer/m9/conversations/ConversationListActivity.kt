@@ -4,11 +4,8 @@ import android.Manifest
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
-import android.database.ContentObserver
 import android.net.Uri
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.provider.Telephony
 import android.view.KeyEvent
 import android.view.View
@@ -38,6 +35,7 @@ import life.furrer.nine.core.ui.applyConfiguredTheme
 import life.furrer.nine.core.ui.dp
 import life.furrer.nine.core.ui.hideStatusBar
 import life.furrer.nine.core.util.Async
+import life.furrer.nine.core.util.ProviderWatcher
 import life.furrer.nine.core.util.Reloader
 
 private const val REQUEST_SMS_PERMISSIONS = 100
@@ -80,7 +78,7 @@ class ConversationListActivity : Activity() {
     private lateinit var hintBar: HintBar
     private lateinit var menuSheet: MenuSheet
     private lateinit var permissionScreen: PermissionScreen
-    private var contentObserver: ContentObserver? = null
+    private val providerWatcher = ProviderWatcher(this, Telephony.Sms.CONTENT_URI) { loadMessages() }
 
     private val binder = object : RowBinder {
         override fun rowCount(): Int = rows.size
@@ -201,7 +199,7 @@ class ConversationListActivity : Activity() {
         super.onResume()
         if (hasNeededPermissions()) {
             permissionScreen.hide()
-            registerContentObserver()
+            providerWatcher.start()
             loadMessages()
             maybeAskForRole()
         } else if (!permissionScreen.isShowing) {
@@ -211,8 +209,7 @@ class ConversationListActivity : Activity() {
 
     override fun onPause() {
         super.onPause()
-        contentObserver?.let { contentResolver.unregisterContentObserver(it) }
-        contentObserver = null
+        providerWatcher.stop()
         searchField.onPause()
         starKey.reset()
     }
@@ -250,14 +247,6 @@ class ConversationListActivity : Activity() {
         } else {
             permissionScreen.show(permissionExplainer())
         }
-    }
-
-    private fun registerContentObserver() {
-        val observer = object : ContentObserver(Handler(Looper.getMainLooper())) {
-            override fun onChange(selfChange: Boolean) = loadMessages()
-        }
-        contentObserver = observer
-        contentResolver.registerContentObserver(Telephony.Sms.CONTENT_URI, true, observer)
     }
 
     private val messagesLoader = Reloader(

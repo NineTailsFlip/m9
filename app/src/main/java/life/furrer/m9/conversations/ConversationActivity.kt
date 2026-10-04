@@ -4,11 +4,8 @@ import android.app.Activity
 import android.content.ContentUris
 import android.content.Context
 import android.content.Intent
-import android.database.ContentObserver
 import android.net.Uri
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.provider.Telephony
 import android.text.InputType
 import android.view.Gravity
@@ -45,6 +42,7 @@ import life.furrer.nine.core.ui.applyConfiguredTheme
 import life.furrer.nine.core.ui.dp
 import life.furrer.nine.core.ui.hideStatusBar
 import life.furrer.nine.core.util.Async
+import life.furrer.nine.core.util.ProviderWatcher
 import life.furrer.nine.core.util.Reloader
 import life.furrer.nine.core.util.PhoneFormat
 
@@ -95,7 +93,7 @@ class ConversationActivity : Activity() {
     private lateinit var keyFocusAnchor: View
     private lateinit var hintBar: HintBar
     private lateinit var menuSheet: MenuSheet
-    private var contentObserver: ContentObserver? = null
+    private val providerWatcher = ProviderWatcher(this, Telephony.Sms.CONTENT_URI) { loadMessages() }
 
     private val binder = object : RowBinder {
         override fun rowCount(): Int = rows.size
@@ -194,7 +192,7 @@ class ConversationActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
-        registerContentObserver()
+        providerWatcher.start()
         loadMessages()
         // Opening a thread is what "read" means. Done on every resume rather than once in
         // onCreate so a message arriving while this screen is in the foreground doesn't leave the
@@ -204,8 +202,7 @@ class ConversationActivity : Activity() {
 
     override fun onPause() {
         super.onPause()
-        contentObserver?.let { contentResolver.unregisterContentObserver(it) }
-        contentObserver = null
+        providerWatcher.stop()
         starKey.reset()
         // Saved on the way out rather than on every keystroke: this is the moment the text would
         // otherwise be lost, and prefs writes are not free.
@@ -215,14 +212,6 @@ class ConversationActivity : Activity() {
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
         if (hasFocus) hideStatusBar()
-    }
-
-    private fun registerContentObserver() {
-        val observer = object : ContentObserver(Handler(Looper.getMainLooper())) {
-            override fun onChange(selfChange: Boolean) = loadMessages()
-        }
-        contentObserver = observer
-        contentResolver.registerContentObserver(Telephony.Sms.CONTENT_URI, true, observer)
     }
 
     /** A thread-scoped read through the same [SmsStore.queryMessages] the list uses (so ordering
