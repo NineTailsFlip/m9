@@ -77,7 +77,6 @@ class ConversationListActivity : Activity() {
         openSettings()
     }
     private var pendingCallNumber: String? = null
-    private var menuConsumedKeyUp: Int? = null
     private val seenKeyDowns = mutableSetOf<Int>()
 
     private lateinit var rowListView: RowListView
@@ -300,25 +299,11 @@ class ConversationListActivity : Activity() {
     }
 
     /** See [SearchField]'s own doc comment for the pattern this follows, and `ContactsActivity`'s
-     *  `dispatchKeyEvent` for the identical structure — including why the menu's trailing
-     *  ACTION_UP has to be swallowed by hand ([menuConsumedKeyUp]) and why a `*` ACTION_UP is only
+     *  `dispatchKeyEvent` for the identical structure — including why a `*` ACTION_UP is only
      *  trusted when this instance saw its own ACTION_DOWN ([seenKeyDowns]). */
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        if (permissionScreen.isShowing) {
-            if (event.action == KeyEvent.ACTION_DOWN) permissionScreen.handleKeyDown(event.keyCode)
-            return true
-        }
-        if (menuSheet.isShowing) {
-            if (event.action == KeyEvent.ACTION_DOWN) {
-                menuSheet.handleKeyDown(event.keyCode, event)
-                menuConsumedKeyUp = event.keyCode
-            }
-            return true
-        }
-        if (event.action == KeyEvent.ACTION_UP && event.keyCode == menuConsumedKeyUp) {
-            menuConsumedKeyUp = null
-            return true
-        }
+        if (permissionScreen.interceptKeyEvent(event)) return true
+        if (menuSheet.interceptKeyEvent(event)) return true
         if (event.keyCode == KeyEvent.KEYCODE_BACK) {
             if (searchField.handleBack(event) { super.dispatchKeyEvent(it) }) return true
             onBackNotConsumedByIme()
