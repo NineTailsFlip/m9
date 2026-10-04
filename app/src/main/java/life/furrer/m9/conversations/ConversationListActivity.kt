@@ -34,6 +34,7 @@ import life.furrer.nine.core.ui.SearchField
 import life.furrer.nine.core.ui.applyConfiguredTheme
 import life.furrer.nine.core.ui.dp
 import life.furrer.nine.core.ui.hideStatusBar
+import life.furrer.nine.core.ui.relaunch
 import life.furrer.nine.core.util.Async
 import life.furrer.nine.core.util.ProviderWatcher
 import life.furrer.nine.core.util.Reloader
@@ -214,16 +215,12 @@ class ConversationListActivity : Activity() {
         starKey.reset()
     }
 
-    /** [SearchField.onDeactivated]'s fix for this device's captured `*`/`#` needs a genuinely
-     *  fresh window — see `ContactsActivity.restartFresh`, which this mirrors, for what was ruled
-     *  out first. [unreadOnly] rides along as an extra for the same reason favourites-only does
-     *  there: it's the one piece of state worth keeping, and everything else is either cheap to
-     *  reload or already empty by the time this fires. */
+    /** [SearchField.onDeactivated]'s escape from the captured `*`/`#` — see [relaunch].
+     *  [unreadOnly] rides along as an extra for the same reason favourites-only does in
+     *  `ContactsActivity`: it's the one piece of state worth keeping, and everything else is either
+     *  cheap to reload or already empty by the time this fires. */
     private fun restartFresh() {
-        finish()
-        overridePendingTransition(0, 0)
-        startActivity(Intent(this, ConversationListActivity::class.java).putExtra(EXTRA_UNREAD_ONLY, unreadOnly))
-        overridePendingTransition(0, 0)
+        relaunch(Intent(this, ConversationListActivity::class.java).putExtra(EXTRA_UNREAD_ONLY, unreadOnly))
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {

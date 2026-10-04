@@ -41,6 +41,7 @@ import life.furrer.nine.core.ui.RowListView
 import life.furrer.nine.core.ui.applyConfiguredTheme
 import life.furrer.nine.core.ui.dp
 import life.furrer.nine.core.ui.hideStatusBar
+import life.furrer.nine.core.ui.relaunch
 import life.furrer.nine.core.util.Async
 import life.furrer.nine.core.util.ProviderWatcher
 import life.furrer.nine.core.util.Reloader
@@ -290,27 +291,19 @@ class ConversationActivity : Activity() {
         updateHint()
     }
 
-    /** Leaving the reply box needs a genuinely fresh window, not just dropped focus.
+    /** Leaving the reply box needs a genuinely fresh window, not just dropped focus — see
+     *  [relaunch].
      *
      *  Confirmed on-device, twice: after typing in the reply row and pressing Back, "*" stopped
-     *  opening the menu at all. Once this hardware's T9 IME has had a live input connection it
-     *  goes on swallowing "*" for its own case-cycling before the event reaches dispatchKeyEvent —
-     *  the same capture `ContactsActivity` documents for its search field.
-     *
-     *  Tried first and **not sufficient**: handing focus to a non-EditText anchor,
-     *  `clearFocus()`, `hideSoftInputFromWindow`, and `restartInput` — in combination. The menu
-     *  key stayed dead. `ContactsActivity.restartFresh` records the same conclusion (and that an
-     *  in-place `recreate()` was ruled out before it), so this takes the same escape: finish and
-     *  relaunch with the identical extras, transitions suppressed so it's invisible.
+     *  opening the menu at all. Tried first and **not sufficient** here too: handing focus to a
+     *  non-EditText anchor, `clearFocus()`, `hideSoftInputFromWindow`, and `restartInput` — in
+     *  combination. The menu key stayed dead.
      *
      *  The screen it comes back to is the one it would have shown anyway — the reply row sits at
      *  the newest message, which is where a freshly-opened thread lands — and the draft survives
      *  because [onPause] writes it. */
     private fun restartFresh() {
-        finish()
-        overridePendingTransition(0, 0)
-        startActivity(intentFor(this, threadId, address, contactName))
-        overridePendingTransition(0, 0)
+        relaunch(intentFor(this, threadId, address, contactName))
     }
 
     private fun stopComposing() {
