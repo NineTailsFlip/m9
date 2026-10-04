@@ -286,7 +286,7 @@ class ConversationListActivity : NineActivity() {
         }
         if (event.keyCode == KeyEvent.KEYCODE_STAR) {
             when (event.action) {
-                KeyEvent.ACTION_DOWN -> starKey.onDown()
+                KeyEvent.ACTION_DOWN -> starKey.onDown(event.repeatCount)
                 KeyEvent.ACTION_UP -> starKey.onUp()
             }
             return true

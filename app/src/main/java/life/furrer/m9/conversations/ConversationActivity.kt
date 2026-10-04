@@ -331,7 +331,7 @@ class ConversationActivity : NineActivity() {
                 return true
             }
             KeyEvent.KEYCODE_STAR -> {
-                if (event.repeatCount == 0) starKey.onDown()
+                starKey.onDown(event.repeatCount)
                 return true
             }
             KeyEvent.KEYCODE_BACK -> {
