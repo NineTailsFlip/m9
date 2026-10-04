@@ -3,6 +3,7 @@ package life.furrer.m9.compose
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.graphics.Paint
 import android.os.Bundle
 import android.provider.Telephony
@@ -29,6 +30,7 @@ import life.furrer.nine.core.ui.Palette
 import life.furrer.nine.core.ui.applyConfiguredTheme
 import life.furrer.nine.core.ui.dp
 import life.furrer.nine.core.ui.hideStatusBar
+import life.furrer.nine.core.ui.relaunch
 import life.furrer.nine.core.util.Async
 
 private const val REQUEST_PICK_NUMBER = 200
@@ -126,7 +128,7 @@ class ComposeActivity : Activity() {
 
         // With a recipient already known there is nothing left to choose, so start where the
         // writing happens — the same landing spot an addressed smsto: intent deserves.
-        focus = if (recipients.isEmpty()) Focus.RECIPIENT else Focus.MESSAGE
+        focus = if (recipients.isEmpty() || intent.getBooleanExtra(EXTRA_ON_RECIPIENT, false)) Focus.RECIPIENT else Focus.MESSAGE
         render()
 
         // "Share via M9" brings text and no addressee, so the one thing left to ask is who it
@@ -193,8 +195,23 @@ class ComposeActivity : Activity() {
         render()
     }
 
-    private fun stopComposing() {
+    /** Leaving the message field needs a fresh window, as it does in the thread's reply row:
+     *  confirmed on-device that once the field had a live input connection, the T9 IME kept
+     *  serving it after [ComposeField.stop] (nothing else here can take focus) and swallowed
+     *  `*` as its own mode key, so the menu stayed dead until some other window had come and
+     *  gone. See [relaunch].
+     *
+     *  Only an empty field can be left (Up and Back both require it), so the recipients are all
+     *  there is to carry over; the relaunched screen lands on the recipient row, where Up/Back
+     *  would have put the selection. */
+    private fun leaveMessageField() {
         messageField.stop()
+        val addresses = recipients.joinToString(",") { Uri.encode(it) }
+        relaunch(
+            Intent(this, ComposeActivity::class.java)
+                .setData(Uri.parse("smsto:$addresses"))
+                .putExtra(EXTRA_ON_RECIPIENT, true),
+        )
     }
 
     /** The message field's keys are intercepted ahead of normal dispatch, for the reason
@@ -212,18 +229,14 @@ class ComposeActivity : Activity() {
                     // Back up to the recipient only from an empty message; mid-sentence, Up
                     // belongs to the text cursor.
                     if (messageField.text.isEmpty()) {
-                        stopComposing()
-                        focus = Focus.RECIPIENT
-                        render()
+                        leaveMessageField()
                         return true
                     }
                 }
                 KeyEvent.KEYCODE_BACK -> {
                     // Reached only once the field is empty — this hardware's IME consumes Back as
                     // a backspace while there's text (see ConversationActivity's own note).
-                    stopComposing()
-                    focus = Focus.RECIPIENT
-                    render()
+                    leaveMessageField()
                     return true
                 }
             }
@@ -365,6 +378,8 @@ class ComposeActivity : Activity() {
     }
 
     companion object {
+        private const val EXTRA_ON_RECIPIENT = "on_recipient"
+
         fun intentFor(context: Context): Intent = Intent(context, ComposeActivity::class.java)
     }
 }
