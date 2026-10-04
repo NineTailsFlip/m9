@@ -192,8 +192,9 @@ class ConversationListActivity : Activity() {
 
     /** onResume, which always follows the result, re-checks the role and reloads. */
     private fun requestSmsRole() {
+        val request = SmsRole.requestIntent(this) ?: return
         @Suppress("DEPRECATION")
-        startActivityForResult(SmsRole.requestIntent(this), REQUEST_SMS_ROLE)
+        startActivityForResult(request, REQUEST_SMS_ROLE)
     }
 
     override fun onResume() {

@@ -123,7 +123,7 @@ class SettingsActivity : NineSettingsActivity() {
                 onSelect = {
                     if (!SmsRole.isHeld(this@SettingsActivity) && SmsRole.isAvailable(this@SettingsActivity)) {
                         @Suppress("DEPRECATION")
-                        startActivityForResult(SmsRole.requestIntent(this@SettingsActivity), REQUEST_SMS_ROLE)
+                        SmsRole.requestIntent(this@SettingsActivity)?.let { startActivityForResult(it, REQUEST_SMS_ROLE) }
                     }
                 },
             )
