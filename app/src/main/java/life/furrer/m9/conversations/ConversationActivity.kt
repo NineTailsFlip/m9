@@ -1,6 +1,5 @@
 package life.furrer.m9.conversations
 
-import android.app.Activity
 import android.content.ContentUris
 import android.content.Context
 import android.content.Intent
@@ -33,12 +32,11 @@ import life.furrer.nine.core.ui.HintBar
 import life.furrer.nine.core.ui.LongPressKey
 import life.furrer.nine.core.ui.MenuItem
 import life.furrer.nine.core.ui.MenuSheet
+import life.furrer.nine.core.ui.NineActivity
 import life.furrer.nine.core.ui.Palette
 import life.furrer.nine.core.ui.RowBinder
 import life.furrer.nine.core.ui.RowListView
-import life.furrer.nine.core.ui.applyConfiguredTheme
 import life.furrer.nine.core.ui.dp
-import life.furrer.nine.core.ui.hideStatusBar
 import life.furrer.nine.core.ui.relaunch
 import life.furrer.nine.core.util.Async
 import life.furrer.nine.core.util.ProviderWatcher
@@ -68,7 +66,7 @@ private const val COMPOSE_BOTTOM_PADDING_DP = 12
  *  it's the most common action in the app, and a screen transition per reply is a keystroke and a
  *  lost place for nothing. Down past the last message enters the field, so it costs no key of its
  *  own. A *new* message still gets its own screen (M5), because that one needs a recipient. */
-class ConversationActivity : Activity() {
+class ConversationActivity : NineActivity() {
 
     private var threadId: Long = -1L
     private var address: String = ""
@@ -106,7 +104,6 @@ class ConversationActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        applyConfiguredTheme()
 
         threadId = intent.getLongExtra(EXTRA_THREAD_ID, -1L)
         address = intent.getStringExtra(EXTRA_ADDRESS).orEmpty()
@@ -160,7 +157,6 @@ class ConversationActivity : Activity() {
             addView(menuSheet, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
         }
         setContentView(root)
-        hideStatusBar()
         // A reply you started and walked away from is still a reply you meant to send.
         composeField.view.setText(Prefs.draft(this, threadId))
         updateHint()
@@ -183,11 +179,6 @@ class ConversationActivity : Activity() {
         // Saved on the way out rather than on every keystroke: this is the moment the text would
         // otherwise be lost, and prefs writes are not free.
         Prefs.setDraft(this, threadId, composeField.text.toString())
-    }
-
-    override fun onWindowFocusChanged(hasFocus: Boolean) {
-        super.onWindowFocusChanged(hasFocus)
-        if (hasFocus) hideStatusBar()
     }
 
     /** A thread-scoped read through the same [SmsStore.queryMessages] the list uses (so ordering

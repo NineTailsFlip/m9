@@ -1,6 +1,5 @@
 package life.furrer.m9.conversations
 
-import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
@@ -17,10 +16,9 @@ import life.furrer.m9.sms.SmsMessage
 import life.furrer.m9.sms.SmsStore
 import life.furrer.nine.core.ui.Dimens
 import life.furrer.nine.core.ui.HintBar
+import life.furrer.nine.core.ui.NineActivity
 import life.furrer.nine.core.ui.Palette
-import life.furrer.nine.core.ui.applyConfiguredTheme
 import life.furrer.nine.core.ui.dp
-import life.furrer.nine.core.ui.hideStatusBar
 import life.furrer.nine.core.util.Async
 import life.furrer.nine.core.util.PhoneFormat
 
@@ -32,7 +30,7 @@ import life.furrer.nine.core.util.PhoneFormat
  *  A [ScrollView] rather than a [life.furrer.nine.core.ui.RowListView]: there is exactly one
  *  variable-height thing on this screen, so d-pad scrolling of a single text block is the whole
  *  interaction, and building it out of rows would be ceremony. */
-class MessageDetailActivity : Activity() {
+class MessageDetailActivity : NineActivity() {
 
     private var messageId: Long = -1L
     private lateinit var bodyView: TextView
@@ -41,7 +39,6 @@ class MessageDetailActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        applyConfiguredTheme()
 
         messageId = intent.getLongExtra(EXTRA_MESSAGE_ID, -1L)
 
@@ -90,13 +87,7 @@ class MessageDetailActivity : Activity() {
                 addView(HintBar(this@MessageDetailActivity).apply { setText("↑↓ scroll · ‹ back") })
             },
         )
-        hideStatusBar()
         load()
-    }
-
-    override fun onWindowFocusChanged(hasFocus: Boolean) {
-        super.onWindowFocusChanged(hasFocus)
-        if (hasFocus) hideStatusBar()
     }
 
     /** Re-read from the provider rather than passed in as extras: unlike the thread screen's

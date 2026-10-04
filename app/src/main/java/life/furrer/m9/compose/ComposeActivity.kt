@@ -1,6 +1,5 @@
 package life.furrer.m9.compose
 
-import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -26,10 +25,9 @@ import life.furrer.nine.core.ui.HintBar
 import life.furrer.nine.core.ui.LongPressKey
 import life.furrer.nine.core.ui.MenuItem
 import life.furrer.nine.core.ui.MenuSheet
+import life.furrer.nine.core.ui.NineActivity
 import life.furrer.nine.core.ui.Palette
-import life.furrer.nine.core.ui.applyConfiguredTheme
 import life.furrer.nine.core.ui.dp
-import life.furrer.nine.core.ui.hideStatusBar
 import life.furrer.nine.core.ui.relaunch
 import life.furrer.nine.core.util.Async
 
@@ -52,7 +50,7 @@ private const val REQUEST_PICK_NUMBER = 200
  *  this screen's own first version): the message field is a permanent part of the layout rather
  *  than a row swapped for an `EditText`, so the Autofill quirk that workaround exists for never
  *  arises. `ConversationActivity`'s reply row is built the same way for the same reason. */
-class ComposeActivity : Activity() {
+class ComposeActivity : NineActivity() {
 
     /** Usually one number. Several only arrive from an `smsto:a,b` link; M9 has no MMS, so they
      *  get the message one by one, each in their own thread — the same as Android's own
@@ -76,7 +74,6 @@ class ComposeActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        applyConfiguredTheme()
 
         // A new message starts blank, always. The only things that can pre-fill it are the intent
         // that opened it — an addressed smsto: from another app, or a Forward carrying its text —
@@ -124,7 +121,6 @@ class ComposeActivity : Activity() {
             importantForAutofill = View.IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS
         }
         setContentView(root)
-        hideStatusBar()
 
         // With a recipient already known there is nothing left to choose, so start where the
         // writing happens — the same landing spot an addressed smsto: intent deserves.
@@ -142,11 +138,6 @@ class ComposeActivity : Activity() {
     override fun onDestroy() {
         super.onDestroy()
         getSystemService(android.view.autofill.AutofillManager::class.java)?.cancel()
-    }
-
-    override fun onWindowFocusChanged(hasFocus: Boolean) {
-        super.onWindowFocusChanged(hasFocus)
-        if (hasFocus) hideStatusBar()
     }
 
     private fun render() {

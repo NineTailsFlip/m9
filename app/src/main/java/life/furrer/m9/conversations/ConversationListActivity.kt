@@ -1,7 +1,6 @@
 package life.furrer.m9.conversations
 
 import android.Manifest
-import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -26,14 +25,13 @@ import life.furrer.nine.core.ui.HintBar
 import life.furrer.nine.core.ui.LongPressKey
 import life.furrer.nine.core.ui.MenuItem
 import life.furrer.nine.core.ui.MenuSheet
+import life.furrer.nine.core.ui.NineActivity
 import life.furrer.nine.core.ui.Palette
 import life.furrer.nine.core.ui.PermissionScreen
 import life.furrer.nine.core.ui.RowBinder
 import life.furrer.nine.core.ui.RowListView
 import life.furrer.nine.core.ui.SearchField
-import life.furrer.nine.core.ui.applyConfiguredTheme
 import life.furrer.nine.core.ui.dp
-import life.furrer.nine.core.ui.hideStatusBar
 import life.furrer.nine.core.ui.relaunch
 import life.furrer.nine.core.util.Async
 import life.furrer.nine.core.util.ProviderWatcher
@@ -63,7 +61,7 @@ private val RESERVED_KEYS = setOf(
  *  intercepts in `dispatchKeyEvent`), and reserved keys have to be pulled out before the IME sees
  *  them. See `ContactsActivity`'s own comments for the on-device findings behind each piece; this
  *  screen is a deliberate mirror of it rather than a second solution to the same problem. */
-class ConversationListActivity : Activity() {
+class ConversationListActivity : NineActivity() {
 
     private var allMessages: List<SmsMessage> = emptyList()
     private var rows: List<ThreadRow> = emptyList()
@@ -98,7 +96,6 @@ class ConversationListActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        applyConfiguredTheme()
 
         unreadOnly = intent.getBooleanExtra(EXTRA_UNREAD_ONLY, false)
 
@@ -142,7 +139,6 @@ class ConversationListActivity : Activity() {
             importantForAutofill = View.IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS
         }
         setContentView(root)
-        hideStatusBar()
         updateHint()
 
         // No load here: onResume always follows and loads, and doing both was measured as two
@@ -226,10 +222,7 @@ class ConversationListActivity : Activity() {
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
-        if (hasFocus) {
-            searchField.onWindowFocusGained()
-            hideStatusBar()
-        }
+        if (hasFocus) searchField.onWindowFocusGained()
     }
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
