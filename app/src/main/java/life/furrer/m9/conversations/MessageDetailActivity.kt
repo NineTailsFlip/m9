@@ -15,6 +15,7 @@ import java.util.Locale
 import life.furrer.m9.core.Prefs
 import life.furrer.m9.sms.SmsMessage
 import life.furrer.m9.sms.SmsStore
+import life.furrer.nine.core.ui.Dimens
 import life.furrer.nine.core.ui.HintBar
 import life.furrer.nine.core.ui.Palette
 import life.furrer.nine.core.ui.applyConfiguredTheme
@@ -23,7 +24,6 @@ import life.furrer.nine.core.ui.hideStatusBar
 import life.furrer.nine.core.util.Async
 import life.furrer.nine.core.util.PhoneFormat
 
-private const val SIDE_PADDING_DP = 16
 
 /** One message in full. The conversation list truncates a long SMS to a few lines and the thread
  *  screen caps it at six, so this is where the rest of it lives — plus the details a row has no
@@ -49,7 +49,7 @@ class MessageDetailActivity : Activity() {
             text = intent.getStringExtra(EXTRA_TITLE).orEmpty()
             textSize = 18f
             setTextColor(Palette.WHITE)
-            setPadding(dp(SIDE_PADDING_DP), dp(10), dp(SIDE_PADDING_DP), dp(6))
+            setPadding(dp(Dimens.SIDE_PADDING_DP), dp(10), dp(Dimens.SIDE_PADDING_DP), dp(6))
         }
         bodyView = TextView(this).apply {
             // The message body honours the font setting, like the thread's own rows do — this is
@@ -59,12 +59,12 @@ class MessageDetailActivity : Activity() {
             // it, and scaling them would eat the room the larger body needs.
             textSize = Prefs.messageFontSize(this@MessageDetailActivity).toFloat()
             setTextColor(Palette.GRAY_DIM)
-            setPadding(dp(SIDE_PADDING_DP), 0, dp(SIDE_PADDING_DP), dp(12))
+            setPadding(dp(Dimens.SIDE_PADDING_DP), 0, dp(Dimens.SIDE_PADDING_DP), dp(12))
         }
         metaView = TextView(this).apply {
             textSize = 12f
             setTextColor(Palette.GRAY_MUTED)
-            setPadding(dp(SIDE_PADDING_DP), 0, dp(SIDE_PADDING_DP), dp(12))
+            setPadding(dp(Dimens.SIDE_PADDING_DP), 0, dp(Dimens.SIDE_PADDING_DP), dp(12))
         }
         scrollView = ScrollView(this).apply {
             // Not focusable: Up/Down are handled in onKeyDown below, so the ScrollView never

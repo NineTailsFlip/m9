@@ -34,6 +34,7 @@ import life.furrer.nine.contacts.ContactStore
 import life.furrer.nine.contacts.resolveNumbers
 import life.furrer.nine.core.Nine
 import life.furrer.nine.core.settings.NineSettingsActivity
+import life.furrer.nine.core.ui.Dimens
 import life.furrer.nine.core.ui.HintBar
 import life.furrer.nine.core.ui.MenuItem
 import life.furrer.nine.core.ui.MenuSheet
@@ -47,7 +48,6 @@ import life.furrer.nine.core.util.Async
 import life.furrer.nine.core.util.Reloader
 import life.furrer.nine.core.util.PhoneFormat
 
-private const val SIDE_PADDING_DP = 16
 private const val REQUEST_CALL_PHONE_PERMISSION = 101
 
 /** The gap between the newest message and the reply box. Only visible when the thread is long
@@ -121,14 +121,14 @@ class ConversationActivity : Activity() {
             text = contactName ?: PhoneFormat.display(this@ConversationActivity, address)
             textSize = 18f
             setTextColor(Palette.WHITE)
-            setPadding(dp(SIDE_PADDING_DP), dp(10), dp(SIDE_PADDING_DP), 0)
+            setPadding(dp(Dimens.SIDE_PADDING_DP), dp(10), dp(Dimens.SIDE_PADDING_DP), 0)
         }
         // Only when a name is showing above it — otherwise this would repeat the title verbatim.
         val subtitle = TextView(this).apply {
             text = PhoneFormat.display(this@ConversationActivity, address)
             textSize = 12f
             setTextColor(Palette.GRAY_MUTED)
-            setPadding(dp(SIDE_PADDING_DP), 0, dp(SIDE_PADDING_DP), dp(6))
+            setPadding(dp(Dimens.SIDE_PADDING_DP), 0, dp(Dimens.SIDE_PADDING_DP), dp(6))
             visibility = if (contactName != null) View.VISIBLE else View.GONE
         }
         rowListView = RowListView(this).apply { setBinder(binder) }
@@ -150,7 +150,7 @@ class ConversationActivity : Activity() {
             gravity = Gravity.START
             // More room below than above: the reply box sits directly on the hint bar, and text
             // with only a few dp under it reads as sitting on the line rather than above it.
-            setPadding(dp(SIDE_PADDING_DP), dp(6), dp(SIDE_PADDING_DP), dp(COMPOSE_BOTTOM_PADDING_DP))
+            setPadding(dp(Dimens.SIDE_PADDING_DP), dp(6), dp(Dimens.SIDE_PADDING_DP), dp(COMPOSE_BOTTOM_PADDING_DP))
             // Focusable only while composing, so Down from the list is what enters it rather
             // than the framework handing it focus on open and swallowing every key.
             isFocusable = false

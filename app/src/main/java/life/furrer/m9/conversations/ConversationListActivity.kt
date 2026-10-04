@@ -24,6 +24,7 @@ import life.furrer.m9.sms.SmsStore
 import life.furrer.nine.contacts.ContactsActivity
 import life.furrer.nine.core.Nine
 import life.furrer.nine.core.settings.NineSettingsActivity
+import life.furrer.nine.core.ui.Dimens
 import life.furrer.nine.core.ui.HintBar
 import life.furrer.nine.core.ui.MenuItem
 import life.furrer.nine.core.ui.MenuSheet
@@ -41,7 +42,6 @@ import life.furrer.nine.core.util.Reloader
 private const val REQUEST_SMS_PERMISSIONS = 100
 private const val REQUEST_CALL_PHONE_PERMISSION = 101
 private const val REQUEST_SMS_ROLE = 102
-private const val SIDE_PADDING_DP = 16
 
 /** Reserved exactly as `ContactsActivity` reserves them, and for the reason its own comment
  *  gives: Up/Down/OK are this screen's list navigation and must never reach the search field,
@@ -117,7 +117,7 @@ class ConversationListActivity : Activity() {
                 textSize = 16f
                 setTextColor(android.graphics.Color.WHITE)
                 setHintTextColor(Palette.GRAY_FAINT)
-                setPadding(dp(SIDE_PADDING_DP), dp(10), dp(SIDE_PADDING_DP), dp(6))
+                setPadding(dp(Dimens.SIDE_PADDING_DP), dp(10), dp(Dimens.SIDE_PADDING_DP), dp(6))
             }
         }
 
@@ -125,7 +125,7 @@ class ConversationListActivity : Activity() {
         countLabel = TextView(this).apply {
             textSize = 12f
             setTextColor(Palette.GRAY_MUTED)
-            setPadding(dp(SIDE_PADDING_DP), dp(4), dp(SIDE_PADDING_DP), dp(4))
+            setPadding(dp(Dimens.SIDE_PADDING_DP), dp(4), dp(Dimens.SIDE_PADDING_DP), dp(4))
             visibility = View.GONE
         }
         hintBar = HintBar(this)

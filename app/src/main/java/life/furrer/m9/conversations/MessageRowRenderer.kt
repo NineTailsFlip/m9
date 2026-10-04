@@ -9,12 +9,13 @@ import android.view.Gravity
 import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.TextView
+import life.furrer.nine.core.ui.Dimens
 import life.furrer.nine.core.ui.Palette
 import life.furrer.nine.core.ui.dp
 import life.furrer.nine.core.util.DateFmt
 
 private const val HEADER_ROW_HEIGHT_DP = 24
-private const val ROW_SIDE_PADDING_DP = 16
+private const val ROW_SIDE_PADDING_DP = Dimens.SIDE_PADDING_DP
 private const val MESSAGE_META_HEIGHT_DP = 18
 
 /** Caps how tall one message row can get, so a pathological SMS can't fill the whole screen —

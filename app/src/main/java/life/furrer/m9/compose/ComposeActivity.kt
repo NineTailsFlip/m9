@@ -25,6 +25,7 @@ import life.furrer.nine.contacts.ContactValuePickerActivity
 import life.furrer.nine.contacts.DataKind
 import life.furrer.nine.core.Nine
 import life.furrer.nine.core.settings.NineSettingsActivity
+import life.furrer.nine.core.ui.Dimens
 import life.furrer.nine.core.ui.HintBar
 import life.furrer.nine.core.ui.MenuItem
 import life.furrer.nine.core.ui.MenuSheet
@@ -34,7 +35,6 @@ import life.furrer.nine.core.ui.dp
 import life.furrer.nine.core.ui.hideStatusBar
 import life.furrer.nine.core.util.Async
 
-private const val SIDE_PADDING_DP = 16
 private const val REQUEST_PICK_NUMBER = 200
 
 /** A new message — deliberately the same screen as a conversation, with the messages missing.
@@ -96,12 +96,12 @@ class ComposeActivity : Activity() {
 
         titleView = TextView(this).apply {
             textSize = 18f
-            setPadding(dp(SIDE_PADDING_DP), dp(10), dp(SIDE_PADDING_DP), 0)
+            setPadding(dp(Dimens.SIDE_PADDING_DP), dp(10), dp(Dimens.SIDE_PADDING_DP), 0)
         }
         subtitleView = TextView(this).apply {
             textSize = 12f
             setTextColor(Palette.GRAY_MUTED)
-            setPadding(dp(SIDE_PADDING_DP), 0, dp(SIDE_PADDING_DP), dp(6))
+            setPadding(dp(Dimens.SIDE_PADDING_DP), 0, dp(Dimens.SIDE_PADDING_DP), dp(6))
         }
         // The gap where a conversation's messages would be. Left empty rather than filled with an
         // explanation: the header already says "New message", and a screen this small is not
@@ -117,7 +117,7 @@ class ComposeActivity : Activity() {
             setHintTextColor(Palette.GRAY_FAINT)
             setBackgroundColor(Palette.BLACK)
             gravity = Gravity.START
-            setPadding(dp(SIDE_PADDING_DP), dp(6), dp(SIDE_PADDING_DP), dp(6))
+            setPadding(dp(Dimens.SIDE_PADDING_DP), dp(6), dp(Dimens.SIDE_PADDING_DP), dp(6))
             isFocusable = false
             isFocusableInTouchMode = false
             addTextChangedListener(object : android.text.TextWatcher {

@@ -9,6 +9,7 @@ import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.TextView
 import java.time.LocalDate
+import life.furrer.nine.core.ui.Dimens
 import life.furrer.nine.core.ui.Palette
 import life.furrer.nine.core.ui.dp
 import life.furrer.nine.core.util.PhoneFormat
@@ -26,7 +27,7 @@ fun threadRowHeightDp(fontSizeSp: Int): Int = fontSizeSp * 2 + 20
 /** The snippet is deliberately smaller than the title — five points, preserved across the whole
  *  range so the hierarchy survives scaling. */
 fun snippetTextSize(fontSizeSp: Int): Float = (fontSizeSp - 5).coerceAtLeast(10).toFloat()
-private const val ROW_SIDE_PADDING_DP = 16
+private const val ROW_SIDE_PADDING_DP = Dimens.SIDE_PADDING_DP
 
 // A fixed column for the unread dot on the *preview* line, so every preview starts at the same x
 // whether or not its thread has one — a ragged left edge is much harder to scan than a
