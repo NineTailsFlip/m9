@@ -6,17 +6,13 @@ import android.content.Intent
 import android.graphics.Paint
 import android.os.Bundle
 import android.provider.Telephony
-import android.text.InputType
-import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
-import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import life.furrer.m9.conversations.ConversationActivity
-import life.furrer.m9.core.Prefs
 import life.furrer.m9.sms.SmsSender
 import life.furrer.m9.sms.SmsStore
 import life.furrer.m9.sms.SmsUri
@@ -67,13 +63,12 @@ class ComposeActivity : Activity() {
     private enum class Focus { RECIPIENT, MESSAGE }
 
     private var focus = Focus.RECIPIENT
-    private var composing = false
 
     private val starKey = LongPressKey(::openMenu) { openNineSettings() }
 
     private lateinit var titleView: TextView
     private lateinit var subtitleView: TextView
-    private lateinit var messageField: EditText
+    private lateinit var messageField: ComposeField
     private lateinit var hintBar: HintBar
     private lateinit var menuSheet: MenuSheet
 
@@ -107,33 +102,18 @@ class ComposeActivity : Activity() {
         // worth spending on telling someone what they just chose to do.
         val emptySpace = View(this)
 
-        messageField = EditText(this).apply {
-            hint = "Message…"
-            textSize = Prefs.messageFontSize(this@ComposeActivity).toFloat()
-            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE
-            setText(initialBody)
-            setTextColor(Palette.WHITE)
-            setHintTextColor(Palette.GRAY_FAINT)
-            setBackgroundColor(Palette.BLACK)
-            gravity = Gravity.START
-            setPadding(dp(Dimens.SIDE_PADDING_DP), dp(6), dp(Dimens.SIDE_PADDING_DP), dp(6))
-            isFocusable = false
-            isFocusableInTouchMode = false
-            addTextChangedListener(object : android.text.TextWatcher {
-                override fun afterTextChanged(s: android.text.Editable?) = updateHint()
-                override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-                override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
-            })
-        }
+        messageField = ComposeField(this, "Message…", bottomPaddingDp = 6, ::updateHint)
         hintBar = HintBar(this)
         menuSheet = MenuSheet(this)
+        // Only now: the field's watcher updates the hint bar, which has to exist first.
+        messageField.view.setText(initialBody)
 
         val mainColumn = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             addView(titleView)
             addView(subtitleView)
             addView(emptySpace, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
-            addView(messageField)
+            addView(messageField.view)
             addView(hintBar)
         }
         val root = FrameLayout(this).apply {
@@ -168,7 +148,7 @@ class ComposeActivity : Activity() {
     }
 
     private fun render() {
-        val selected = focus == Focus.RECIPIENT && !composing
+        val selected = focus == Focus.RECIPIENT && !messageField.isComposing
         titleView.text = if (recipients.isEmpty()) {
             "New message"
         } else {
@@ -194,7 +174,7 @@ class ComposeActivity : Activity() {
     }
 
     private fun updateHint() {
-        if (composing) {
+        if (messageField.isComposing) {
             val segments = segmentLabel(messageField.text.toString())
             hintBar.setText(if (segments.isEmpty()) "ok send · ↑ recipient" else "$segments · ok send")
             return
@@ -209,23 +189,12 @@ class ComposeActivity : Activity() {
 
     private fun startComposing() {
         focus = Focus.MESSAGE
-        if (composing) {
-            render()
-            return
-        }
-        composing = true
-        messageField.isFocusable = true
-        messageField.isFocusableInTouchMode = true
-        messageField.requestFocus()
+        messageField.start()
         render()
     }
 
     private fun stopComposing() {
-        if (!composing) return
-        composing = false
-        messageField.clearFocus()
-        messageField.isFocusable = false
-        messageField.isFocusableInTouchMode = false
+        messageField.stop()
     }
 
     /** The message field's keys are intercepted ahead of normal dispatch, for the reason
@@ -233,7 +202,7 @@ class ComposeActivity : Activity() {
      *  newline and every character key, so [onKeyDown] — which only runs for keys no view took —
      *  would never see them. */
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        if (composing && event.action == KeyEvent.ACTION_DOWN) {
+        if (messageField.isComposing && event.action == KeyEvent.ACTION_DOWN) {
             when (event.keyCode) {
                 KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_CALL -> {
                     send()
@@ -264,7 +233,7 @@ class ComposeActivity : Activity() {
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
         if (menuSheet.handleKeyDown(keyCode, event)) return true
-        if (composing) return super.onKeyDown(keyCode, event)
+        if (messageField.isComposing) return super.onKeyDown(keyCode, event)
 
         when (keyCode) {
             KeyEvent.KEYCODE_DPAD_DOWN -> {

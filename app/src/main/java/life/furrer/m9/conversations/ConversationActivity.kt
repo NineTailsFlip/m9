@@ -7,17 +7,15 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.provider.Telephony
-import android.text.InputType
-import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
-import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
 import java.time.LocalDate
 import life.furrer.m9.compose.ComposeActivity
+import life.furrer.m9.compose.ComposeField
 import life.furrer.m9.core.Prefs
 import life.furrer.m9.sms.MessageNotifications
 import life.furrer.m9.sms.OtpCodes
@@ -82,12 +80,11 @@ class ConversationActivity : Activity() {
     private var pendingCallNumber: String? = null
     private val starKey = LongPressKey(::openMenu) { openNineSettings() }
 
-    /** True while the compose field has focus and is taking typed characters. The list keeps its
-     *  own selection underneath, so leaving the field puts the user back exactly where they were. */
-    private var composing = false
-
     private lateinit var rowListView: RowListView
-    private lateinit var composeField: EditText
+
+    /** While it's composing, the list keeps its own selection underneath, so leaving the field
+     *  puts the user back exactly where they were. */
+    private lateinit var composeField: ComposeField
 
     /** Somewhere for focus to go that isn't an EditText, so leaving the reply row doesn't leave
      *  the window focusing nothing (see [releaseImeFocus]). */
@@ -134,31 +131,9 @@ class ConversationActivity : Activity() {
             isFocusable = true
             isFocusableInTouchMode = true
         }
-        composeField = EditText(this).apply {
-            hint = "Reply…"
-            // Same size as the messages above it and as the compose screen's own field: what you
-            // are writing should look like what you are reading.
-            textSize = Prefs.messageFontSize(this@ConversationActivity).toFloat()
-            // Multi-line: an SMS wraps, and a compose box that scrolled sideways on one line
-            // would hide what you already typed.
-            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE
-            setTextColor(Palette.WHITE)
-            setHintTextColor(Palette.GRAY_FAINT)
-            setBackgroundColor(Palette.BLACK)
-            gravity = Gravity.START
-            // More room below than above: the reply box sits directly on the hint bar, and text
-            // with only a few dp under it reads as sitting on the line rather than above it.
-            setPadding(dp(Dimens.SIDE_PADDING_DP), dp(6), dp(Dimens.SIDE_PADDING_DP), dp(COMPOSE_BOTTOM_PADDING_DP))
-            // Focusable only while composing, so Down from the list is what enters it rather
-            // than the framework handing it focus on open and swallowing every key.
-            isFocusable = false
-            isFocusableInTouchMode = false
-            addTextChangedListener(object : android.text.TextWatcher {
-                override fun afterTextChanged(s: android.text.Editable?) = updateHint()
-                override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-                override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
-            })
-        }
+        // More room below than above: the reply box sits directly on the hint bar, and text with
+        // only a few dp under it reads as sitting on the line rather than above it.
+        composeField = ComposeField(this, "Reply…", COMPOSE_BOTTOM_PADDING_DP, ::updateHint)
         hintBar = HintBar(this)
         menuSheet = MenuSheet(this)
 
@@ -173,7 +148,7 @@ class ConversationActivity : Activity() {
             // one block — the message you just received and the message you're about to write
             // should not look like the same thing.
             addView(
-                composeField,
+                composeField.view,
                 LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
                     topMargin = dp(COMPOSE_TOP_GAP_DP)
                 },
@@ -187,7 +162,7 @@ class ConversationActivity : Activity() {
         setContentView(root)
         hideStatusBar()
         // A reply you started and walked away from is still a reply you meant to send.
-        composeField.setText(Prefs.draft(this, threadId))
+        composeField.view.setText(Prefs.draft(this, threadId))
         updateHint()
     }
 
@@ -253,7 +228,7 @@ class ConversationActivity : Activity() {
     }
 
     private fun updateHint() {
-        if (composing) {
+        if (composeField.isComposing) {
             // The segment counter earns the hint bar's whole width while typing: on a prepaid SIM
             // "2 messages" is the difference between one charge and two, and it's the only place
             // that can warn before the message goes out. Silent for an ordinary short message.
@@ -283,11 +258,7 @@ class ConversationActivity : Activity() {
      *  unsafe over it (the IME keeps composing behind an open menu on this hardware), so the menu
      *  is only reachable while not composing. */
     private fun startComposing() {
-        if (composing) return
-        composing = true
-        composeField.isFocusable = true
-        composeField.isFocusableInTouchMode = true
-        composeField.requestFocus()
+        if (!composeField.start()) return
         updateHint()
     }
 
@@ -307,11 +278,7 @@ class ConversationActivity : Activity() {
     }
 
     private fun stopComposing() {
-        if (!composing) return
-        composing = false
-        composeField.isFocusable = false
-        composeField.isFocusableInTouchMode = false
-        composeField.clearFocus()
+        if (!composeField.stop()) return
         keyFocusAnchor.requestFocus()
         restartFresh()
     }
@@ -324,7 +291,7 @@ class ConversationActivity : Activity() {
         if (address.isBlank()) return
 
         SmsSender.send(this, threadId, address, body)
-        composeField.setText("")
+        composeField.view.setText("")
         Prefs.setDraft(this, threadId, "")
         stopComposing()
         // The provider write is what the thread actually renders from; this just stops the list
@@ -337,7 +304,7 @@ class ConversationActivity : Activity() {
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
         if (menuSheet.handleKeyDown(keyCode, event)) return true
 
-        if (composing) return super.onKeyDown(keyCode, event)
+        if (composeField.isComposing) return super.onKeyDown(keyCode, event)
 
         when (keyCode) {
             KeyEvent.KEYCODE_DPAD_UP -> {
@@ -391,7 +358,7 @@ class ConversationActivity : Activity() {
      *  editors here. Confirmed on-device: without this, OK inserted a line break and the send key
      *  fell through to the system, which opened P9's dialer instead. */
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        if (composing && event.action == KeyEvent.ACTION_DOWN) {
+        if (composeField.isComposing && event.action == KeyEvent.ACTION_DOWN) {
             when (event.keyCode) {
                 KeyEvent.KEYCODE_BACK -> {
                     // Only reached when the field is empty: confirmed on-device that this
