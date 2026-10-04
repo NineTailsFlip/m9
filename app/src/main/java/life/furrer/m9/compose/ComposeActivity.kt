@@ -23,10 +23,10 @@ import life.furrer.m9.sms.SmsUri
 import life.furrer.m9.sms.segmentLabel
 import life.furrer.nine.contacts.ContactValuePickerActivity
 import life.furrer.nine.contacts.DataKind
-import life.furrer.nine.core.Nine
-import life.furrer.nine.core.settings.NineSettingsActivity
+import life.furrer.nine.core.settings.openNineSettings
 import life.furrer.nine.core.ui.Dimens
 import life.furrer.nine.core.ui.HintBar
+import life.furrer.nine.core.ui.LongPressKey
 import life.furrer.nine.core.ui.MenuItem
 import life.furrer.nine.core.ui.MenuSheet
 import life.furrer.nine.core.ui.Palette
@@ -69,8 +69,7 @@ class ComposeActivity : Activity() {
     private var focus = Focus.RECIPIENT
     private var composing = false
 
-    private var pendingStarKeyCode: Int? = null
-    private var starLongPressHandled = false
+    private val starKey = LongPressKey(::openMenu) { openNineSettings() }
 
     private lateinit var titleView: TextView
     private lateinit var subtitleView: TextView
@@ -289,8 +288,7 @@ class ComposeActivity : Activity() {
                 return true
             }
             KeyEvent.KEYCODE_STAR -> {
-                event.startTracking()
-                pendingStarKeyCode = keyCode
+                if (event.repeatCount == 0) starKey.onDown()
                 return true
             }
             KeyEvent.KEYCODE_BACK -> {
@@ -303,21 +301,15 @@ class ComposeActivity : Activity() {
 
     override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
         if (keyCode == KeyEvent.KEYCODE_STAR) {
-            if (pendingStarKeyCode == keyCode && !starLongPressHandled) openMenu()
-            starLongPressHandled = false
-            pendingStarKeyCode = null
+            starKey.onUp()
             return true
         }
         return super.onKeyUp(keyCode, event)
     }
 
-    override fun onKeyLongPress(keyCode: Int, event: KeyEvent): Boolean {
-        if (keyCode == KeyEvent.KEYCODE_STAR) {
-            starLongPressHandled = true
-            startActivity(NineSettingsActivity.intentFor(this, Nine.app.settingsActivity))
-            return true
-        }
-        return super.onKeyLongPress(keyCode, event)
+    override fun onPause() {
+        super.onPause()
+        starKey.reset()
     }
 
     /** The whole recipient interaction: search by name, browse letter-grouped, or type the number
@@ -365,7 +357,7 @@ class ComposeActivity : Activity() {
         items += MenuItem(if (recipients.isEmpty()) "Pick recipient" else "Change recipient") { openNumberPicker() }
         if (recipients.isNotEmpty() && messageField.text.isNotBlank()) items += MenuItem("Send") { send() }
         items += MenuItem("Discard") { finish() }
-        items += MenuItem("Settings") { startActivity(NineSettingsActivity.intentFor(this, Nine.app.settingsActivity)) }
+        items += MenuItem("Settings") { openNineSettings() }
         menuSheet.show(items)
     }
 

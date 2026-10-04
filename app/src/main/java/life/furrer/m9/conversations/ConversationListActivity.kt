@@ -23,9 +23,10 @@ import life.furrer.m9.sms.SmsRole
 import life.furrer.m9.sms.SmsStore
 import life.furrer.nine.contacts.ContactsActivity
 import life.furrer.nine.core.Nine
-import life.furrer.nine.core.settings.NineSettingsActivity
+import life.furrer.nine.core.settings.openNineSettings
 import life.furrer.nine.core.ui.Dimens
 import life.furrer.nine.core.ui.HintBar
+import life.furrer.nine.core.ui.LongPressKey
 import life.furrer.nine.core.ui.MenuItem
 import life.furrer.nine.core.ui.MenuSheet
 import life.furrer.nine.core.ui.Palette
@@ -69,15 +70,9 @@ class ConversationListActivity : Activity() {
     private var rows: List<ThreadRow> = emptyList()
     private var unreadOnly = false
 
-    // See ContactsActivity's identical fields for the on-device reasoning behind all three.
-    private val longPressHandler = Handler(Looper.getMainLooper())
-    private var starLongPressFired = false
-    private val starLongPressRunnable = Runnable {
-        starLongPressFired = true
-        openSettings()
-    }
+    // See ContactsActivity's identical field for the on-device reasoning behind it.
+    private val starKey = LongPressKey(::openMenu) { openNineSettings() }
     private var pendingCallNumber: String? = null
-    private val seenKeyDowns = mutableSetOf<Int>()
 
     private lateinit var rowListView: RowListView
     private lateinit var searchField: SearchField
@@ -219,7 +214,7 @@ class ConversationListActivity : Activity() {
         contentObserver?.let { contentResolver.unregisterContentObserver(it) }
         contentObserver = null
         searchField.onPause()
-        seenKeyDowns.clear()
+        starKey.reset()
     }
 
     /** [SearchField.onDeactivated]'s fix for this device's captured `*`/`#` needs a genuinely
@@ -300,7 +295,7 @@ class ConversationListActivity : Activity() {
 
     /** See [SearchField]'s own doc comment for the pattern this follows, and `ContactsActivity`'s
      *  `dispatchKeyEvent` for the identical structure — including why a `*` ACTION_UP is only
-     *  trusted when this instance saw its own ACTION_DOWN ([seenKeyDowns]). */
+     *  trusted when this instance saw its own ACTION_DOWN ([starKey]). */
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (permissionScreen.interceptKeyEvent(event)) return true
         if (menuSheet.interceptKeyEvent(event)) return true
@@ -311,15 +306,8 @@ class ConversationListActivity : Activity() {
         }
         if (event.keyCode == KeyEvent.KEYCODE_STAR) {
             when (event.action) {
-                KeyEvent.ACTION_DOWN -> {
-                    seenKeyDowns.add(event.keyCode)
-                    starLongPressFired = false
-                    longPressHandler.postDelayed(starLongPressRunnable, android.view.ViewConfiguration.getLongPressTimeout().toLong())
-                }
-                KeyEvent.ACTION_UP -> {
-                    longPressHandler.removeCallbacks(starLongPressRunnable)
-                    if (seenKeyDowns.remove(event.keyCode) && !starLongPressFired) openMenu()
-                }
+                KeyEvent.ACTION_DOWN -> starKey.onDown()
+                KeyEvent.ACTION_UP -> starKey.onUp()
             }
             return true
         }
@@ -422,7 +410,7 @@ class ConversationListActivity : Activity() {
         if (!SmsRole.isHeld(this) && SmsRole.isAvailable(this)) {
             items += MenuItem("Set M9 as default messaging app") { requestSmsRole() }
         }
-        items += MenuItem("Settings") { openSettings() }
+        items += MenuItem("Settings") { openNineSettings() }
         menuSheet.show(items)
     }
 
@@ -467,10 +455,6 @@ class ConversationListActivity : Activity() {
                 MenuItem("Cancel") { menuSheet.hide() },
             ),
         )
-    }
-
-    private fun openSettings() {
-        startActivity(NineSettingsActivity.intentFor(this, Nine.app.settingsActivity))
     }
 
     private companion object {

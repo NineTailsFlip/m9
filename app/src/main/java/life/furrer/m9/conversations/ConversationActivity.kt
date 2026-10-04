@@ -32,10 +32,10 @@ import life.furrer.nine.contacts.ContactDetailActivity
 import life.furrer.nine.contacts.ContactHandoff
 import life.furrer.nine.contacts.ContactStore
 import life.furrer.nine.contacts.resolveNumbers
-import life.furrer.nine.core.Nine
-import life.furrer.nine.core.settings.NineSettingsActivity
+import life.furrer.nine.core.settings.openNineSettings
 import life.furrer.nine.core.ui.Dimens
 import life.furrer.nine.core.ui.HintBar
+import life.furrer.nine.core.ui.LongPressKey
 import life.furrer.nine.core.ui.MenuItem
 import life.furrer.nine.core.ui.MenuSheet
 import life.furrer.nine.core.ui.Palette
@@ -60,7 +60,7 @@ private const val COMPOSE_BOTTOM_PADDING_DP = 12
 /** One thread: every message with its correspondent, oldest at the top.
  *
  *  No [life.furrer.nine.core.ui.SearchField] here, which makes the key handling the simpler
- *  `onKeyDown`/`onKeyLongPress` shape L9's `MainActivity` uses rather than the
+ *  `onKeyDown`/`onKeyUp` shape L9's `MainActivity` uses rather than the
  *  `dispatchKeyEvent` interception the conversation list needs. That difference is not cosmetic:
  *  with no live IME connection on this screen, a [MenuSheet] shown over it is safe — the quirk
  *  documented on `:contacts`' `ContactValuePickerActivity` (this hardware's T9 IME composing into
@@ -81,8 +81,7 @@ class ConversationActivity : Activity() {
     private var rows: List<MessageRow> = emptyList()
 
     private var pendingCallNumber: String? = null
-    private var pendingStarKeyCode: Int? = null
-    private var starLongPressHandled = false
+    private val starKey = LongPressKey(::openMenu) { openNineSettings() }
 
     /** True while the compose field has focus and is taking typed characters. The list keeps its
      *  own selection underneath, so leaving the field puts the user back exactly where they were. */
@@ -207,6 +206,7 @@ class ConversationActivity : Activity() {
         super.onPause()
         contentObserver?.let { contentResolver.unregisterContentObserver(it) }
         contentObserver = null
+        starKey.reset()
         // Saved on the way out rather than on every keystroke: this is the moment the text would
         // otherwise be lost, and prefs writes are not free.
         Prefs.setDraft(this, threadId, composeField.text.toString())
@@ -391,8 +391,7 @@ class ConversationActivity : Activity() {
                 return true
             }
             KeyEvent.KEYCODE_STAR -> {
-                event.startTracking()
-                pendingStarKeyCode = keyCode
+                if (event.repeatCount == 0) starKey.onDown()
                 return true
             }
             KeyEvent.KEYCODE_BACK -> {
@@ -440,21 +439,10 @@ class ConversationActivity : Activity() {
 
     override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
         if (keyCode == KeyEvent.KEYCODE_STAR) {
-            if (pendingStarKeyCode == keyCode && !starLongPressHandled) openMenu()
-            starLongPressHandled = false
-            pendingStarKeyCode = null
+            starKey.onUp()
             return true
         }
         return super.onKeyUp(keyCode, event)
-    }
-
-    override fun onKeyLongPress(keyCode: Int, event: KeyEvent): Boolean {
-        if (keyCode == KeyEvent.KEYCODE_STAR) {
-            starLongPressHandled = true
-            openSettings()
-            return true
-        }
-        return super.onKeyLongPress(keyCode, event)
     }
 
     /** A fast scrub through a long thread, the same one C9's contacts list does across letter
@@ -540,7 +528,7 @@ class ConversationActivity : Activity() {
         if (canCall()) items += MenuItem("Call") { call() }
         contactMenuItems().let { items += it }
         items += MenuItem("Delete conversation") { confirmDeleteThread() }
-        items += MenuItem("Settings") { openSettings() }
+        items += MenuItem("Settings") { openNineSettings() }
         menuSheet.show(items)
     }
 
@@ -612,9 +600,6 @@ class ConversationActivity : Activity() {
         )
     }
 
-    private fun openSettings() {
-        startActivity(NineSettingsActivity.intentFor(this, Nine.app.settingsActivity))
-    }
 
     companion object {
         private const val EXTRA_THREAD_ID = "thread_id"
