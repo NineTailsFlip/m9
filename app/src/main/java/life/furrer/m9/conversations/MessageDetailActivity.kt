@@ -18,6 +18,7 @@ import life.furrer.m9.sms.SmsStore
 import life.furrer.nine.core.ui.HintBar
 import life.furrer.nine.core.ui.Palette
 import life.furrer.nine.core.ui.applyConfiguredTheme
+import life.furrer.nine.core.ui.dp
 import life.furrer.nine.core.ui.hideStatusBar
 import life.furrer.nine.core.util.Async
 import life.furrer.nine.core.util.PhoneFormat
@@ -157,10 +158,6 @@ class MessageDetailActivity : Activity() {
         }
         return super.onKeyDown(keyCode, event)
     }
-
-    private fun dp(value: Int): Int = android.util.TypedValue.applyDimension(
-        android.util.TypedValue.COMPLEX_UNIT_DIP, value.toFloat(), resources.displayMetrics
-    ).toInt()
 
     companion object {
         private const val EXTRA_MESSAGE_ID = "message_id"

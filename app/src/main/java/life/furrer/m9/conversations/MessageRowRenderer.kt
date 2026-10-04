@@ -10,12 +10,12 @@ import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.TextView
 import life.furrer.nine.core.ui.Palette
+import life.furrer.nine.core.ui.dp
 import life.furrer.nine.core.util.DateFmt
 
 private const val HEADER_ROW_HEIGHT_DP = 24
 private const val ROW_SIDE_PADDING_DP = 16
 private const val MESSAGE_META_HEIGHT_DP = 18
-
 
 /** Caps how tall one message row can get, so a pathological SMS can't fill the whole screen —
  *  [MessageDetailActivity] is where the rest of it lives. */
@@ -47,7 +47,7 @@ private class MessageMeasurer(context: Context, fontSizeSp: Int) {
 
     /** The screen's width, not the list view's: `RowListView` fills the window horizontally, and
      *  its own measured width isn't known yet at the point row heights are asked for. */
-    private val widthPx = (context.resources.displayMetrics.widthPixels - 2 * dp(context, ROW_SIDE_PADDING_DP)).coerceAtLeast(1)
+    private val widthPx = (context.resources.displayMetrics.widthPixels - 2 * context.dp(ROW_SIDE_PADDING_DP)).coerceAtLeast(1)
 
     /** Height in px of [text] as it will actually wrap, clamped to [MAX_LINES]. */
     fun textHeightPx(text: String): Int {
@@ -127,7 +127,7 @@ private fun bindMessage(container: LinearLayout, row: MessageRow.Entry, selected
             // costs the reading nothing.
             setTextColor(if (selected) Color.WHITE else Palette.GRAY_DIM)
             paintFlags = paintFlags and Paint.UNDERLINE_TEXT_FLAG.inv()
-            setPadding(dp(context, ROW_SIDE_PADDING_DP), 0, dp(context, ROW_SIDE_PADDING_DP), 0)
+            setPadding(context.dp(ROW_SIDE_PADDING_DP), 0, context.dp(ROW_SIDE_PADDING_DP), 0)
         },
         LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f),
     )
@@ -142,15 +142,11 @@ private fun bindMessage(container: LinearLayout, row: MessageRow.Entry, selected
             textSize = 11f
             gravity = alignment
             setTextColor(if (row.status == SendStatus.FAILED) Palette.RED else Palette.GRAY_MUTED)
-            setPadding(dp(context, ROW_SIDE_PADDING_DP), 0, dp(context, ROW_SIDE_PADDING_DP), dp(context, 2))
+            setPadding(context.dp(ROW_SIDE_PADDING_DP), 0, context.dp(ROW_SIDE_PADDING_DP), context.dp(2))
         },
         LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT),
     )
 }
-
-private fun dp(context: Context, value: Int): Int = android.util.TypedValue.applyDimension(
-    android.util.TypedValue.COMPLEX_UNIT_DIP, value.toFloat(), context.resources.displayMetrics
-).toInt()
 
 /** The inverse of [dp] — row heights are declared in dp (RowListView converts them back), but
  *  text measurement answers in px. */

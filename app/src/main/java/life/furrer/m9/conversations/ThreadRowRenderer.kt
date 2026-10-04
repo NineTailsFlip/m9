@@ -10,6 +10,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import java.time.LocalDate
 import life.furrer.nine.core.ui.Palette
+import life.furrer.nine.core.ui.dp
 import life.furrer.nine.core.util.PhoneFormat
 
 /** Always two lines — title and snippet — unlike P9's call log, where the second line is detail
@@ -53,7 +54,7 @@ fun bindThreadRow(container: LinearLayout, row: ThreadRow, selected: Boolean, fo
     val mainLine = LinearLayout(context).apply {
         orientation = LinearLayout.HORIZONTAL
         gravity = Gravity.CENTER_VERTICAL
-        setPadding(dp(context, ROW_SIDE_PADDING_DP), 0, dp(context, ROW_SIDE_PADDING_DP), 0)
+        setPadding(context.dp(ROW_SIDE_PADDING_DP), 0, context.dp(ROW_SIDE_PADDING_DP), 0)
     }
     mainLine.addView(
         TextView(context).apply {
@@ -91,7 +92,7 @@ fun bindThreadRow(container: LinearLayout, row: ThreadRow, selected: Boolean, fo
     // read", and the unread thing is the message previewed on that line, not the name above it.
     val previewLine = LinearLayout(context).apply {
         orientation = LinearLayout.HORIZONTAL
-        setPadding(dp(context, ROW_SIDE_PADDING_DP), 0, dp(context, ROW_SIDE_PADDING_DP), dp(context, 6))
+        setPadding(context.dp(ROW_SIDE_PADDING_DP), 0, context.dp(ROW_SIDE_PADDING_DP), context.dp(6))
     }
     // Only an unread row spends the width. A read row's preview runs flush with the title above
     // it, which is both the common case and the one with the least to say — reserving the column
@@ -111,7 +112,7 @@ fun bindThreadRow(container: LinearLayout, row: ThreadRow, selected: Boolean, fo
                 textSize = 11f
                 setTextColor(unreadDotColor)
             },
-            LinearLayout.LayoutParams(dp(context, MARKER_COLUMN_WIDTH_DP), ViewGroup.LayoutParams.WRAP_CONTENT),
+            LinearLayout.LayoutParams(context.dp(MARKER_COLUMN_WIDTH_DP), ViewGroup.LayoutParams.WRAP_CONTENT),
         )
     }
     previewLine.addView(
@@ -145,6 +146,3 @@ fun bindThreadRow(container: LinearLayout, row: ThreadRow, selected: Boolean, fo
     )
 }
 
-private fun dp(context: Context, value: Int): Int = android.util.TypedValue.applyDimension(
-    android.util.TypedValue.COMPLEX_UNIT_DIP, value.toFloat(), context.resources.displayMetrics
-).toInt()

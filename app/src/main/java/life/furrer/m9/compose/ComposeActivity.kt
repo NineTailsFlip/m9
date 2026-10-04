@@ -30,6 +30,7 @@ import life.furrer.nine.core.ui.MenuItem
 import life.furrer.nine.core.ui.MenuSheet
 import life.furrer.nine.core.ui.Palette
 import life.furrer.nine.core.ui.applyConfiguredTheme
+import life.furrer.nine.core.ui.dp
 import life.furrer.nine.core.ui.hideStatusBar
 import life.furrer.nine.core.util.Async
 
@@ -401,10 +402,6 @@ class ComposeActivity : Activity() {
             },
         )
     }
-
-    private fun dp(value: Int): Int = android.util.TypedValue.applyDimension(
-        android.util.TypedValue.COMPLEX_UNIT_DIP, value.toFloat(), resources.displayMetrics
-    ).toInt()
 
     companion object {
         fun intentFor(context: Context): Intent = Intent(context, ComposeActivity::class.java)

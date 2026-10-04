@@ -33,6 +33,7 @@ import life.furrer.nine.core.ui.RowBinder
 import life.furrer.nine.core.ui.RowListView
 import life.furrer.nine.core.ui.SearchField
 import life.furrer.nine.core.ui.applyConfiguredTheme
+import life.furrer.nine.core.ui.dp
 import life.furrer.nine.core.ui.hideStatusBar
 import life.furrer.nine.core.util.Async
 import life.furrer.nine.core.util.Reloader
@@ -486,10 +487,6 @@ class ConversationListActivity : Activity() {
     private fun openSettings() {
         startActivity(NineSettingsActivity.intentFor(this, Nine.app.settingsActivity))
     }
-
-    private fun dp(value: Int): Int = android.util.TypedValue.applyDimension(
-        android.util.TypedValue.COMPLEX_UNIT_DIP, value.toFloat(), resources.displayMetrics
-    ).toInt()
 
     private companion object {
         const val EXTRA_UNREAD_ONLY = "unread_only"
