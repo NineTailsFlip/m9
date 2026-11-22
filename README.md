@@ -29,14 +29,16 @@ edit it if your SDK lives elsewhere.
 
 ## Package name
 
-The app id is still upstream's (`life.furrer.m9`), so that upstream's history merges cleanly.
-This has two consequences:
+Our builds are `io.github.ninetailsflip.m9`, so they install **next to** the official M9
+(`life.furrer.m9`) instead of replacing it. The Kotlin package stays upstream's
+(`life.furrer.m9`), so upstream's changes still merge cleanly.
 
-- A build from here replaces the official M9 on the phone rather than sitting beside it.
-- It can't update an official build in place, because the signing keys differ. Uninstall that
-  first.
+## Installing and updates
 
-Change `applicationId` in `app/build.gradle.kts` before publishing a build of our own.
+Signed builds are published on [Releases](https://github.com/NineTailsFlip/m9/releases). Install the first one by hand. After that, M9 checks for a newer release once a day when its main screen opens and offers to update. Android asks you to confirm each update, and the first time it also asks you to allow M9 to install apps. You can turn the check off, or run it now, in Settings → Updates.
+
+Releases are built by GitHub Actions from a `v<versionName>` tag. See
+[RELEASING.md](https://github.com/NineTailsFlip/.github/blob/main/RELEASING.md).
 
 ## Staying in sync with upstream
 

@@ -1,5 +1,6 @@
 package life.furrer.m9.settings
 
+import io.github.ninetailsflip.update.updatesSection
 import life.furrer.m9.core.Prefs
 import life.furrer.m9.sms.SmsRole
 import life.furrer.nine.core.NineSurface
@@ -180,5 +181,6 @@ class SettingsActivity : NineSettingsActivity() {
                 set = { value -> Prefs.setMessagesToLoad(this@SettingsActivity, value) },
             )
         }
+        updatesSection(screen, this, ::refresh)
     }
 }

@@ -1,6 +1,7 @@
 package life.furrer.m9
 
 import android.app.Application
+import io.github.ninetailsflip.update.Updates
 import life.furrer.m9.settings.SettingsActivity
 import life.furrer.nine.core.KeyHelp
 import life.furrer.nine.core.Nine
@@ -11,6 +12,7 @@ class M9Application : Application() {
     override fun onCreate() {
         super.onCreate()
         Nine.init(m9App)
+        Updates.init(this, "NineTailsFlip/m9")
     }
 }
 

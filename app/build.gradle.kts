@@ -20,7 +20,7 @@ android {
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "life.furrer.m9"
+        applicationId = "io.github.ninetailsflip.m9"
         minSdk = 34
         targetSdk = 34
         versionCode = 5
@@ -85,6 +85,7 @@ android {
 
 dependencies {
     implementation(project(":core"))
+    implementation(project(":update"))
     // M9 is the second real consumer of :contacts (after P9) — the shared browse/search/detail
     // screens and ContactValuePickerActivity (docs/m9-plan.md's M0) that ComposeActivity will use
     // from M5 on.
